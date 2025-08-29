@@ -385,22 +385,7 @@
     </script>
 </body>
 </html>
-        window.addEventListener('focus', () => {
-            console.log('ページフォーカス時の更新...');
-            forceRefresh();
-        });
 
-        // ページが非表示になったときはポーリングを停止
-        document.addEventListener('visibilitychange', () => {
-            isPolling = !document.hidden;
-            if (isPolling) {
-                console.log('ポーリング再開');
-                loadCalledNumbers();
-            } else {
-                console.log('ポーリング停止');
-            }
-        });
-    </script>
 </body>
 </html>
 

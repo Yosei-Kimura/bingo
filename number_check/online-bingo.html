@@ -8,12 +8,69 @@
         body {
             font-family: 'Arial', sans-serif;
             margin: 0;
-            padding: 20px;
+            padding: 0;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             min-height: 100vh;
             display: flex;
             flex-direction: column;
             align-items: center;
+        }
+
+        /* ナビゲーションバー */
+        .navbar {
+            width: 100%;
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            padding: 10px 0;
+            position: sticky;
+            top: 0;
+            z-index: 1000;
+        }
+
+        .navbar-content {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .navbar-brand {
+            font-size: 1.2em;
+            font-weight: bold;
+            color: #333;
+        }
+
+        .navbar-nav {
+            display: flex;
+            gap: 15px;
+            align-items: center;
+        }
+
+        .navbar-link {
+            color: #333;
+            text-decoration: none;
+            padding: 8px 16px;
+            border-radius: 6px;
+            transition: all 0.3s;
+            font-weight: 500;
+        }
+
+        .navbar-link:hover {
+            background: #3498db;
+            color: white;
+            transform: translateY(-1px);
+        }
+
+        .navbar-link.dashboard {
+            background: #2c3e50;
+            color: white;
+        }
+
+        .navbar-link.dashboard:hover {
+            background: #34495e;
         }
 
         .container {
@@ -24,6 +81,7 @@
             text-align: center;
             max-width: 600px;
             width: 100%;
+            margin: 20px;
         }
 
         h1 {
@@ -416,6 +474,21 @@
         .confetti:nth-child(9) { left: 90%; background: #34495e; animation-delay: 4s; }
         
         @media (max-width: 600px) {
+            .navbar-content {
+                flex-direction: column;
+                gap: 10px;
+                padding: 10px;
+            }
+
+            .navbar-nav {
+                gap: 10px;
+            }
+
+            .navbar-link {
+                padding: 6px 12px;
+                font-size: 0.9em;
+            }
+
             .container {
                 padding: 20px;
                 margin: 10px;
@@ -440,6 +513,26 @@
     </style>
 </head>
 <body>
+    <!-- ナビゲーションバー -->
+    <nav class="navbar">
+        <div class="navbar-content">
+            <div class="navbar-brand">
+                🎯 オンラインビンゴ
+            </div>
+            <div class="navbar-nav">
+                <a href="../運営用/dashboard.html" class="navbar-link dashboard">
+                    📊 ダッシュボード
+                </a>
+                <a href="../運営用/index.html" class="navbar-link">
+                    🎲 番号管理
+                </a>
+                <a href="../index.php" class="navbar-link">
+                    🏠 ホーム
+                </a>
+            </div>
+        </div>
+    </nav>
+
     <div class="connection-status" id="connectionStatus">接続中...</div>
     
     <div class="container">
@@ -488,7 +581,8 @@
             
             <div class="controls">
                 <button class="refresh-btn" onclick="loadCalledNumbers()">🔄 番号更新</button>
-                <button class="bingo-btn" onclick="checkBingo()">🎉 ビンゴ！</button>
+                <button class="refresh-btn" onclick="checkBingo()" style="background: #e67e22;">🎯 ビンゴチェック</button>
+                <button class="refresh-btn" onclick="logout()" style="background: #e74c3c;">🚪 ログアウト</button>
             </div>
             
             <div class="status info" id="gameStatus">
@@ -547,7 +641,7 @@
             loginBtn.textContent = '取得中...';
             
             try {
-                const response = await fetch('../api/card-manager.php', {
+                const response = await fetch('../api/get-card.php', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -560,22 +654,21 @@
                 
                 const data = await response.json();
                 
-                if (data.success) {
+                if (data.success && data.card) {
                     currentCard = data.card;
+                    
+                    // ログイン情報を保存
+                    saveLogin(password, data.card);
+                    
                     showBingoCard();
                     initializeGame();
-                    
-                    if (data.action === 'new_card') {
-                        showStatus('新しいビンゴカードを作成しました！', 'success');
-                    } else {
-                        showStatus('既存のビンゴカードを読み込みました。', 'info');
-                    }
+                    showStatus('ビンゴカードを取得しました！', 'success');
                 } else {
                     showStatus(data.error || 'カードの取得に失敗しました。', 'error');
                 }
                 
             } catch (error) {
-                console.error('Login error:', error);
+                console.error('ログインエラー:', error);
                 showStatus('サーバーとの接続に失敗しました。', 'error');
             } finally {
                 loginBtn.disabled = false;
@@ -588,12 +681,17 @@
             document.getElementById('loginSection').style.display = 'none';
             document.getElementById('bingoSection').style.display = 'block';
             
-            // 参加者情報を表示
+            // 参加者情報を表示（ログアウトボタンを追加）
             const participantInfo = document.getElementById('participantInfo');
             participantInfo.innerHTML = `
-                <strong>パスワード:</strong> ${currentCard.password}<br>
-                ${currentCard.participant_name ? `<strong>お名前:</strong> ${currentCard.participant_name}<br>` : ''}
-                <strong>カード作成日時:</strong> ${new Date(currentCard.created_at).toLocaleString('ja-JP')}
+                <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap;">
+                    <div>
+                        <strong>カード作成日時:</strong> ${new Date(currentCard.created_at).toLocaleString('ja-JP')}
+                    </div>
+                    <button onclick="logout()" style="background: #e74c3c; color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer; font-size: 0.9em;">
+                        ログアウト
+                    </button>
+                </div>
             `;
             
             // ビンゴカードを描画
@@ -1092,6 +1190,128 @@
                 closeBingoPopup();
             }
         });
+
+        // ページ読み込み時にログイン状態をチェック
+        document.addEventListener('DOMContentLoaded', function() {
+            checkSavedLogin();
+        });
+
+        // 保存されたログイン状態をチェック
+        function checkSavedLogin() {
+            const savedPassword = localStorage.getItem('bingoPassword');
+            const savedCard = localStorage.getItem('bingoCardData');
+            const savedLoginTime = localStorage.getItem('bingoLoginTime');
+            
+            // 24時間以内のログイン情報のみ有効
+            const twentyFourHours = 24 * 60 * 60 * 1000;
+            if (savedPassword && savedCard && savedLoginTime) {
+                const loginTime = parseInt(savedLoginTime);
+                if (Date.now() - loginTime < twentyFourHours) {
+                    try {
+                        currentCard = JSON.parse(savedCard);
+                        
+                        // パスワードフィールドに自動入力
+                        const passwordField = document.getElementById('password');
+                        if (passwordField) {
+                            passwordField.value = savedPassword;
+                        }
+                        
+                        // 自動ログイン実行
+                        console.log('保存されたログイン情報を使用して自動ログイン中...');
+                        showBingoCard();
+                        initializeGame();
+                        showStatus('前回のログイン状態を復元しました', 'success');
+                        return;
+                    } catch (error) {
+                        console.error('保存されたデータの復元に失敗:', error);
+                        clearSavedLogin();
+                    }
+                } else {
+                    console.log('ログイン情報が期限切れです');
+                    clearSavedLogin();
+                }
+            }
+            
+            // 保存されたログイン情報がない場合、ログイン画面を表示
+            showLoginForm();
+        }
+
+        // ログイン情報を保存
+        function saveLogin(password, cardData) {
+            try {
+                localStorage.setItem('bingoPassword', password);
+                localStorage.setItem('bingoCardData', JSON.stringify(cardData));
+                localStorage.setItem('bingoLoginTime', Date.now().toString());
+                console.log('ログイン情報を保存しました');
+            } catch (error) {
+                console.error('ログイン情報の保存に失敗:', error);
+            }
+        }
+
+        // 保存されたログイン情報をクリア
+        function clearSavedLogin() {
+            localStorage.removeItem('bingoPassword');
+            localStorage.removeItem('bingoCardData');
+            localStorage.removeItem('bingoLoginTime');
+            console.log('保存されたログイン情報をクリアしました');
+        }
+
+        // ログアウト機能を追加
+        function logout() {
+            clearSavedLogin();
+            currentCard = null;
+            calledNumbers = [];
+            if (bingoCheckInterval) {
+                clearInterval(bingoCheckInterval);
+                bingoCheckInterval = null;
+            }
+            
+            // ログイン画面に戻る
+            document.getElementById('bingoSection').style.display = 'none';
+            document.getElementById('loginSection').style.display = 'block';
+            
+            // フォームをリセット
+            const form = document.getElementById('loginForm');
+            if (form) {
+                form.reset();
+            }
+            
+            showStatus('ログアウトしました', 'info');
+        }
+
+        // ログインフォームを表示
+        function showLoginForm() {
+            const loginSection = document.getElementById('loginSection');
+            if (!loginSection.querySelector('.login-form').innerHTML) {
+                loginSection.querySelector('.login-form').innerHTML = `
+                    <div class="form-group">
+                        <label for="password">パスワード:</label>
+                        <input type="password" id="password" name="password" required 
+                               placeholder="8桁のパスワードを入力">
+                    </div>
+                    <div class="form-group">
+                        <label for="participantName">参加者名（任意）:</label>
+                        <input type="text" id="participantName" name="participantName" 
+                               placeholder="表示名を入力（省略可）">
+                    </div>
+                    <button type="button" class="login-btn" id="loginBtn" onclick="login()">
+                        ビンゴカードを取得
+                    </button>
+                `;
+                
+                // Enterキーでログイン
+                document.getElementById('password').addEventListener('keypress', function(e) {
+                    if (e.key === 'Enter') {
+                        login();
+                    }
+                });
+            }
+            
+            loginSection.querySelector('.status').innerHTML = `
+                パスワードを入力してビンゴカードを取得してください。<br>
+                <small>※ログイン状態は24時間保持されます</small>
+            `;
+        }
     </script>
 </body>
 </html>

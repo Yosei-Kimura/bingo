@@ -7,17 +7,81 @@
     <style>
         body {
             font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+
+        /* ナビゲーションバー */
+        .navbar {
+            width: 100%;
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            padding: 10px 0;
+            position: sticky;
+            top: 0;
+            z-index: 1000;
+        }
+
+        .navbar-content {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .navbar-brand {
+            font-size: 1.2em;
+            font-weight: bold;
+            color: #333;
+        }
+
+        .navbar-nav {
+            display: flex;
+            gap: 15px;
+            align-items: center;
+        }
+
+        .navbar-link {
+            color: #333;
+            text-decoration: none;
+            padding: 8px 16px;
+            border-radius: 6px;
+            transition: all 0.3s;
+            font-weight: 500;
+        }
+
+        .navbar-link:hover {
+            background: #3498db;
+            color: white;
+            transform: translateY(-1px);
+        }
+
+        .navbar-link.dashboard {
+            background: #2c3e50;
+            color: white;
+        }
+
+        .navbar-link.dashboard:hover {
+            background: #34495e;
+        }
+
+        .content {
             display: flex;
             justify-content: center;
             align-items: center;
-            min-height: 100vh;
-            margin: 0;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: calc(100vh - 80px);
             color: white;
         }
+
         .loading {
             text-align: center;
         }
+
         .spinner {
             width: 50px;
             height: 50px;
@@ -31,13 +95,55 @@
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
         }
+
+        @media (max-width: 768px) {
+            .navbar-content {
+                flex-direction: column;
+                gap: 10px;
+                padding: 10px;
+            }
+
+            .navbar-nav {
+                gap: 10px;
+            }
+
+            .navbar-link {
+                padding: 6px 12px;
+                font-size: 0.9em;
+            }
+        }
     </style>
 </head>
 <body>
-    <div class="loading">
-        <div class="spinner"></div>
-        <h2>ビンゴ大会管理システム</h2>
-        <p>ダッシュボードに移動しています...</p>
+    <!-- ナビゲーションバー -->
+    <nav class="navbar">
+        <div class="navbar-content">
+            <div class="navbar-brand">
+                🎯 運営管理システム
+            </div>
+            <div class="navbar-nav">
+                <a href="dashboard.html" class="navbar-link dashboard">
+                    📊 ダッシュボード
+                </a>
+                <a href="index.html" class="navbar-link">
+                    🎲 番号管理
+                </a>
+                <a href="check.html" class="navbar-link">
+                    ✅ ビンゴチェック
+                </a>
+                <a href="online-bingo-manager.html" class="navbar-link">
+                    💻 オンライン管理
+                </a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="content">
+        <div class="loading">
+            <div class="spinner"></div>
+            <h2>ビンゴ大会管理システム</h2>
+            <p>ダッシュボードに移動しています...</p>
+        </div>
     </div>
 
     <script>
