@@ -21,10 +21,10 @@ try {
     
     $input = json_decode(file_get_contents('php://input'), true);
     $password = trim($input['password'] ?? '');
-    $markedCells = $input['marked_cells'] ?? [];
+    $calledNumbers = $input['called_numbers'] ?? [];
     
     if ($DEBUG_MODE) {
-        error_log("check-bingo.php: Input data - Password: $password, Marked cells: " . json_encode($markedCells));
+        error_log("check-bingo.php: Input data - Password: $password, Called numbers: " . json_encode($calledNumbers));
     }
     
     if (empty($password)) {
@@ -44,12 +44,15 @@ try {
         error_log("check-bingo.php: Card found - ID: " . $card['id']);
     }
     
-    // 呼ばれた番号を取得
-    $stmt = $pdo->query("SELECT number FROM bingo_numbers ORDER BY called_at ASC");
-    $calledNumbersData = $stmt->fetchAll(PDO::FETCH_COLUMN);
+    // 最新の呼ばれた番号を取得（フォールバック）
+    if (empty($calledNumbers)) {
+        $stmt = $pdo->query("SELECT number FROM bingo_numbers ORDER BY called_at ASC");
+        $calledNumbers = $stmt->fetchAll(PDO::FETCH_COLUMN);
+        $calledNumbers = array_map('intval', $calledNumbers);
+    }
     
     if ($DEBUG_MODE) {
-        error_log("check-bingo.php: Called numbers: " . json_encode($calledNumbersData));
+        error_log("check-bingo.php: Called numbers: " . json_encode($calledNumbers));
     }
     
     $cardData = json_decode($card['card_data'], true);
@@ -59,7 +62,7 @@ try {
     }
     
     // ビンゴ判定を実行
-    $bingoResult = checkBingoWithDebug($cardData, $markedCells, $calledNumbersData, $DEBUG_MODE);
+    $bingoResult = checkBingoWithCalledNumbers($cardData, $calledNumbers, $DEBUG_MODE);
     
     if ($DEBUG_MODE) {
         error_log("check-bingo.php: Bingo result: " . json_encode($bingoResult));
@@ -68,12 +71,18 @@ try {
     // ビンゴが成立している場合は記録を保存
     if ($bingoResult['has_bingo'] && !empty($bingoResult['lines'])) {
         foreach ($bingoResult['lines'] as $line) {
-            $stmt = $pdo->prepare("INSERT INTO bingo_achievements (card_id, achievement_type, winning_numbers) VALUES (?, ?, ?)");
-            $stmt->execute([
-                $card['id'],
-                $line['type'],
-                json_encode($calledNumbersData)
-            ]);
+            // 重複チェック
+            $checkStmt = $pdo->prepare("SELECT COUNT(*) FROM bingo_achievements WHERE card_id = ? AND achievement_type = ?");
+            $checkStmt->execute([$card['id'], $line['type']]);
+            
+            if ($checkStmt->fetchColumn() == 0) {
+                $stmt = $pdo->prepare("INSERT INTO bingo_achievements (card_id, achievement_type, winning_numbers) VALUES (?, ?, ?)");
+                $stmt->execute([
+                    $card['id'],
+                    $line['type'],
+                    json_encode($calledNumbers)
+                ]);
+            }
         }
         
         if ($DEBUG_MODE) {
@@ -86,11 +95,9 @@ try {
         'bingo_result' => $bingoResult,
         'debug_info' => [
             'card_id' => $card['id'],
-            'called_numbers_count' => count($calledNumbersData),
-            'marked_cells_count' => count($markedCells),
+            'called_numbers_count' => count($calledNumbers),
             'card_data' => $cardData,
-            'called_numbers' => $calledNumbersData,
-            'marked_cells' => $markedCells
+            'called_numbers' => $calledNumbers
         ]
     ]);
     
@@ -113,70 +120,36 @@ try {
 }
 
 /**
- * デバッグ機能付きビンゴ判定
+ * 呼ばれた番号のみでビンゴ判定
  */
-function checkBingoWithDebug($cardData, $markedCells, $calledNumbers, $debug = false) {
+function checkBingoWithCalledNumbers($cardData, $calledNumbers, $debug = false) {
     $lines = [];
-    $invalidMarkedCount = 0;
     
     if ($debug) {
-        error_log("checkBingoWithDebug: Starting bingo check");
-        error_log("checkBingoWithDebug: Card data: " . json_encode($cardData));
-        error_log("checkBingoWithDebug: Marked cells: " . json_encode($markedCells));
-        error_log("checkBingoWithDebug: Called numbers: " . json_encode($calledNumbers));
-    }
-    
-    // マークされたセルの妥当性をチェック
-    $validMarkedCells = [];
-    foreach ($markedCells as $cellId) {
-        $parts = explode('-', $cellId);
-        if (count($parts) !== 2) {
-            if ($debug) error_log("checkBingoWithDebug: Invalid cell ID format: $cellId");
-            continue;
-        }
-        
-        $row = intval($parts[0]);
-        $col = intval($parts[1]);
-        
-        if ($row < 0 || $row > 4 || $col < 0 || $col > 4) {
-            if ($debug) error_log("checkBingoWithDebug: Cell out of range: $cellId");
-            continue;
-        }
-        
-        $number = $cardData[$row][$col];
-        
-        // FREEセル（中央、値が0）は常に有効
-        if ($row === 2 && $col === 2 && $number === 0) {
-            $validMarkedCells[] = $cellId;
-            if ($debug) error_log("checkBingoWithDebug: FREE cell marked: $cellId");
-            continue;
-        }
-        
-        // 呼ばれた番号かチェック
-        if (in_array($number, $calledNumbers)) {
-            $validMarkedCells[] = $cellId;
-            if ($debug) error_log("checkBingoWithDebug: Valid marked cell: $cellId (number: $number)");
-        } else {
-            $invalidMarkedCount++;
-            if ($debug) error_log("checkBingoWithDebug: Invalid marked cell: $cellId (number: $number not called)");
-        }
-    }
-    
-    if ($debug) {
-        error_log("checkBingoWithDebug: Valid marked cells: " . json_encode($validMarkedCells));
-        error_log("checkBingoWithDebug: Invalid marked count: $invalidMarkedCount");
+        error_log("checkBingoWithCalledNumbers: Starting bingo check");
+        error_log("checkBingoWithCalledNumbers: Card data: " . json_encode($cardData));
+        error_log("checkBingoWithCalledNumbers: Called numbers: " . json_encode($calledNumbers));
     }
     
     // 横のライン判定
     for ($row = 0; $row < 5; $row++) {
         $lineComplete = true;
         $lineCells = [];
+        $lineNumbers = [];
         
         for ($col = 0; $col < 5; $col++) {
             $cellId = "$row-$col";
+            $number = $cardData[$row][$col];
             $lineCells[] = $cellId;
+            $lineNumbers[] = $number;
             
-            if (!in_array($cellId, $validMarkedCells)) {
+            // FREEセル（中央、値が0）は常に有効
+            if ($row === 2 && $col === 2 && $number === 0) {
+                continue;
+            }
+            
+            // 呼ばれた番号に含まれているかチェック
+            if (!in_array($number, $calledNumbers)) {
                 $lineComplete = false;
                 break;
             }
@@ -186,16 +159,12 @@ function checkBingoWithDebug($cardData, $markedCells, $calledNumbers, $debug = f
             $lines[] = [
                 'type' => 'line_horizontal',
                 'description' => '横のライン（' . ($row + 1) . '行目）',
-                'cells' => $lineCells
+                'cells' => $lineCells,
+                'numbers' => $lineNumbers
             ];
             
             if ($debug) {
-                error_log("checkBingoWithDebug: Horizontal line completed: row $row");
-            }
-        } else {
-            if ($debug) {
-                $markedInLine = array_intersect($lineCells, $validMarkedCells);
-                error_log("checkBingoWithDebug: Horizontal line incomplete: row $row, marked: " . count($markedInLine) . "/5");
+                error_log("checkBingoWithCalledNumbers: Horizontal line completed: row $row");
             }
         }
     }
@@ -204,12 +173,21 @@ function checkBingoWithDebug($cardData, $markedCells, $calledNumbers, $debug = f
     for ($col = 0; $col < 5; $col++) {
         $lineComplete = true;
         $lineCells = [];
+        $lineNumbers = [];
         
         for ($row = 0; $row < 5; $row++) {
             $cellId = "$row-$col";
+            $number = $cardData[$row][$col];
             $lineCells[] = $cellId;
+            $lineNumbers[] = $number;
             
-            if (!in_array($cellId, $validMarkedCells)) {
+            // FREEセル（中央、値が0）は常に有効
+            if ($row === 2 && $col === 2 && $number === 0) {
+                continue;
+            }
+            
+            // 呼ばれた番号に含まれているかチェック
+            if (!in_array($number, $calledNumbers)) {
                 $lineComplete = false;
                 break;
             }
@@ -219,28 +197,32 @@ function checkBingoWithDebug($cardData, $markedCells, $calledNumbers, $debug = f
             $lines[] = [
                 'type' => 'line_vertical',
                 'description' => '縦のライン（' . ['B', 'I', 'N', 'G', 'O'][$col] . '列）',
-                'cells' => $lineCells
+                'cells' => $lineCells,
+                'numbers' => $lineNumbers
             ];
             
             if ($debug) {
-                error_log("checkBingoWithDebug: Vertical line completed: col $col");
-            }
-        } else {
-            if ($debug) {
-                $markedInLine = array_intersect($lineCells, $validMarkedCells);
-                error_log("checkBingoWithDebug: Vertical line incomplete: col $col, marked: " . count($markedInLine) . "/5");
+                error_log("checkBingoWithCalledNumbers: Vertical line completed: col $col");
             }
         }
     }
     
     // 斜めのライン判定（左上から右下）
     $diagonalCells1 = [];
+    $diagonalNumbers1 = [];
     $diagonal1Complete = true;
     for ($i = 0; $i < 5; $i++) {
         $cellId = "$i-$i";
+        $number = $cardData[$i][$i];
         $diagonalCells1[] = $cellId;
+        $diagonalNumbers1[] = $number;
         
-        if (!in_array($cellId, $validMarkedCells)) {
+        // FREEセル（中央、値が0）は常に有効
+        if ($i === 2 && $number === 0) {
+            continue;
+        }
+        
+        if (!in_array($number, $calledNumbers)) {
             $diagonal1Complete = false;
         }
     }
@@ -249,27 +231,31 @@ function checkBingoWithDebug($cardData, $markedCells, $calledNumbers, $debug = f
         $lines[] = [
             'type' => 'line_diagonal',
             'description' => '斜めのライン（左上から右下）',
-            'cells' => $diagonalCells1
+            'cells' => $diagonalCells1,
+            'numbers' => $diagonalNumbers1
         ];
         
         if ($debug) {
-            error_log("checkBingoWithDebug: Diagonal line 1 completed");
-        }
-    } else {
-        if ($debug) {
-            $markedInLine = array_intersect($diagonalCells1, $validMarkedCells);
-            error_log("checkBingoWithDebug: Diagonal line 1 incomplete: marked: " . count($markedInLine) . "/5");
+            error_log("checkBingoWithCalledNumbers: Diagonal line 1 completed");
         }
     }
     
     // 斜めのライン判定（右上から左下）
     $diagonalCells2 = [];
+    $diagonalNumbers2 = [];
     $diagonal2Complete = true;
     for ($i = 0; $i < 5; $i++) {
         $cellId = "$i-" . (4 - $i);
+        $number = $cardData[$i][4 - $i];
         $diagonalCells2[] = $cellId;
+        $diagonalNumbers2[] = $number;
         
-        if (!in_array($cellId, $validMarkedCells)) {
+        // FREEセル（中央、値が0）は常に有効
+        if ($i === 2 && $number === 0) {
+            continue;
+        }
+        
+        if (!in_array($number, $calledNumbers)) {
             $diagonal2Complete = false;
         }
     }
@@ -278,52 +264,65 @@ function checkBingoWithDebug($cardData, $markedCells, $calledNumbers, $debug = f
         $lines[] = [
             'type' => 'line_diagonal',
             'description' => '斜めのライン（右上から左下）',
-            'cells' => $diagonalCells2
+            'cells' => $diagonalCells2,
+            'numbers' => $diagonalNumbers2
         ];
         
         if ($debug) {
-            error_log("checkBingoWithDebug: Diagonal line 2 completed");
-        }
-    } else {
-        if ($debug) {
-            $markedInLine = array_intersect($diagonalCells2, $validMarkedCells);
-            error_log("checkBingoWithDebug: Diagonal line 2 incomplete: marked: " . count($markedInLine) . "/5");
+            error_log("checkBingoWithCalledNumbers: Diagonal line 2 completed");
         }
     }
     
     // フルハウス判定
-    $totalCells = 25;
-    $validMarkedCount = count($validMarkedCells);
-    $isFullHouse = ($validMarkedCount === $totalCells);
+    $allNumbers = [];
+    $allCells = [];
+    for ($row = 0; $row < 5; $row++) {
+        for ($col = 0; $col < 5; $col++) {
+            $number = $cardData[$row][$col];
+            $cellId = "$row-$col";
+            $allNumbers[] = $number;
+            $allCells[] = $cellId;
+        }
+    }
+    
+    $isFullHouse = true;
+    foreach ($allNumbers as $index => $number) {
+        // FREEセル（値が0）は常に有効
+        if ($number === 0) {
+            continue;
+        }
+        
+        if (!in_array($number, $calledNumbers)) {
+            $isFullHouse = false;
+            break;
+        }
+    }
     
     if ($isFullHouse) {
         $lines[] = [
             'type' => 'full_house',
             'description' => 'フルハウス（全マス）',
-            'cells' => $validMarkedCells
+            'cells' => $allCells,
+            'numbers' => $allNumbers
         ];
         
         if ($debug) {
-            error_log("checkBingoWithDebug: Full house completed");
-        }
-    } else {
-        if ($debug) {
-            error_log("checkBingoWithDebug: Full house incomplete: marked: $validMarkedCount/$totalCells");
+            error_log("checkBingoWithCalledNumbers: Full house completed");
         }
     }
     
     $hasBingo = !empty($lines);
     
     if ($debug) {
-        error_log("checkBingoWithDebug: Final result - Has bingo: " . ($hasBingo ? 'YES' : 'NO') . ", Lines: " . count($lines));
+        error_log("checkBingoWithCalledNumbers: Final result - Has bingo: " . ($hasBingo ? 'YES' : 'NO') . ", Lines: " . count($lines));
     }
     
     return [
         'has_bingo' => $hasBingo,
         'lines' => $lines,
-        'invalid_marked_count' => $invalidMarkedCount,
-        'total_marked_count' => count($markedCells),
-        'valid_marked_count' => count($validMarkedCells)
+        'called_numbers_count' => count($calledNumbers),
+        'card_numbers_matched' => array_intersect($allNumbers, $calledNumbers)
     ];
 }
 ?>
+

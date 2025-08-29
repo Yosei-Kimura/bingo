@@ -204,7 +204,6 @@
             font-weight: bold;
             background: white;
             border: 1px solid #ddd;
-            cursor: pointer;
             transition: all 0.3s;
             user-select: none;
         }
@@ -755,16 +754,13 @@ async function loadCalledNumbers() {
     }
 }
 
-// 自動ビンゴチェック関数（追加）
+// 自動ビンゴチェック関数（修正）
 async function autoCheckBingo() {
     if (!currentCard || calledNumbers.length === 0) {
         return;
     }
     
     try {
-        const markedElements = document.querySelectorAll('.bingo-cell.marked');
-        const markedCells = Array.from(markedElements).map(el => el.id).filter(id => id);
-        
         const response = await fetch('../api/check-bingo.php', {
             method: 'POST',
             headers: {
@@ -772,7 +768,7 @@ async function autoCheckBingo() {
             },
             body: JSON.stringify({
                 password: currentCard.password,
-                marked_cells: markedCells
+                called_numbers: calledNumbers
             })
         });
         
@@ -797,7 +793,7 @@ async function autoCheckBingo() {
     }
 }
 
-// 手動ビンゴチェック関数（追加）
+// 手動ビンゴチェック関数（修正）
 async function checkBingo() {
     if (!currentCard) {
         showStatus('カードが読み込まれていません', 'error');
@@ -811,9 +807,10 @@ async function checkBingo() {
     }
     
     try {
-        // マークされたセルを取得
-        const markedElements = document.querySelectorAll('.bingo-cell.marked, .bingo-cell.called, .bingo-cell.free');
-        const markedCells = Array.from(markedElements).map(el => el.id).filter(id => id);
+        console.log('送信データ:', {
+            password: currentCard.password,
+            called_numbers: calledNumbers
+        });
         
         const response = await fetch('../api/check-bingo.php', {
             method: 'POST',
@@ -822,11 +819,31 @@ async function checkBingo() {
             },
             body: JSON.stringify({
                 password: currentCard.password,
-                marked_cells: markedCells
+                called_numbers: calledNumbers
             })
         });
         
-        const data = await response.json();
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        
+        const responseText = await response.text();
+        console.log('サーバーレスポンス:', responseText);
+        
+        if (responseText.startsWith('<!DOCTYPE') || responseText.startsWith('<html')) {
+            throw new Error('check-bingo.phpファイルが見つかりません');
+        }
+        
+        let data;
+        try {
+            data = JSON.parse(responseText);
+        } catch (parseError) {
+            console.error('JSON parse error:', parseError);
+            console.error('Response text:', responseText);
+            throw new Error('サーバーから無効なJSONレスポンスを受信しました');
+        }
+        
+        console.log('ビンゴチェック結果:', data);
         
         if (data.success) {
             if (data.bingo_result && data.bingo_result.has_bingo) {
@@ -834,7 +851,9 @@ async function checkBingo() {
                 highlightBingoLines(data.bingo_result.lines);
                 showStatus('🎉 ビンゴが成立しています！ 🎉', 'success');
             } else {
-                showStatus('まだビンゴになっていません', 'info');
+                const debugInfo = data.debug_info || {};
+                console.log('ビンゴ判定詳細:', debugInfo);
+                showStatus(`まだビンゴになっていません（呼ばれた番号: ${calledNumbers.length}個）`, 'info');
             }
         } else {
             showStatus('ビンゴチェックに失敗しました: ' + (data.error || '不明なエラー'), 'error');
@@ -842,7 +861,19 @@ async function checkBingo() {
         
     } catch (error) {
         console.error('ビンゴチェックエラー:', error);
-        showStatus('ビンゴチェック中にエラーが発生しました', 'error');
+        let errorMessage = 'ビンゴチェック中にエラーが発生しました';
+        
+        if (error.message.includes('HTTP error')) {
+            errorMessage += ' - サーバーエラー: ' + error.message;
+        } else if (error.message.includes('JSON')) {
+            errorMessage += ' - データ形式エラー';
+        } else if (error.message.includes('fetch')) {
+            errorMessage += ' - 接続エラー';
+        } else {
+            errorMessage += ': ' + error.message;
+        }
+        
+        showStatus(errorMessage, 'error');
     } finally {
         if (bingoBtn) {
             bingoBtn.disabled = false;
@@ -851,7 +882,7 @@ async function checkBingo() {
     }
 }
 
-// ビンゴポップアップ表示関数（追加）
+// ビンゴポップアップ表示関数（修正）
 function showBingoPopup(bingoLines) {
     const popup = document.getElementById('bingoPopup');
     const linesList = document.getElementById('bingoLinesList');
@@ -859,7 +890,9 @@ function showBingoPopup(bingoLines) {
     // ビンゴラインを表示
     let linesHtml = '';
     bingoLines.forEach((line, index) => {
-        linesHtml += `<div class="bingo-line-item">${getLineTypeName(line.type)} (${line.positions.length}個)</div>`;
+        // line.positions ではなく line.cells または line.numbers を使用
+        const cellCount = line.cells ? line.cells.length : (line.numbers ? line.numbers.length : 0);
+        linesHtml += `<div class="bingo-line-item">${line.description || getLineTypeName(line.type)} (${cellCount}個)</div>`;
     });
     
     if (linesList) {
@@ -880,7 +913,7 @@ function closeBingoPopup() {
     }
 }
 
-// ビンゴラインをハイライト表示（追加）
+// ビンゴラインをハイライト表示（修正）
 function highlightBingoLines(bingoLines) {
     // 既存のハイライトをクリア
     document.querySelectorAll('.bingo-cell.bingo-line').forEach(cell => {
@@ -889,8 +922,9 @@ function highlightBingoLines(bingoLines) {
     
     // 新しいハイライトを追加
     bingoLines.forEach(line => {
-        line.positions.forEach(pos => {
-            const cell = document.getElementById(pos);
+        line.cells.forEach(cellId => {
+            const fullCellId = cellId.includes('cell-') ? cellId : `cell-${cellId}`;
+            const cell = document.getElementById(fullCellId);
             if (cell) {
                 cell.classList.add('bingo-line');
             }
@@ -898,12 +932,13 @@ function highlightBingoLines(bingoLines) {
     });
 }
 
-// ライン種別名を取得（追加）
+// ライン種別名を取得（修正）
 function getLineTypeName(type) {
     const typeNames = {
-        'horizontal': '横一列',
-        'vertical': '縦一列',
-        'diagonal': '斜め一列'
+        'line_horizontal': '横一列',
+        'line_vertical': '縦一列', 
+        'line_diagonal': '斜め一列',
+        'full_house': 'フルハウス'
     };
     return typeNames[type] || type;
 }
@@ -1088,25 +1123,12 @@ function generateCardHTML(cardData) {
                 // FREE スペース
                 html += `<div class="bingo-cell free" id="${cellId}">FREE</div>`;
             } else {
-                html += `<div class="bingo-cell" id="${cellId}" onclick="toggleCell('${cellId}')">${number}</div>`;
+                html += `<div class="bingo-cell" id="${cellId}">${number}</div>`;
             }
         }
     }
     
     return html;
-}
-
-// セルをクリックした時の処理
-function toggleCell(cellId) {
-    const cell = document.getElementById(cellId);
-    if (cell && !cell.classList.contains('free')) {
-        cell.classList.toggle('marked');
-        
-        // 自動ビンゴチェック
-        setTimeout(() => {
-            autoCheckBingo();
-        }, 100);
-    }
 }
 
 // 呼ばれた番号を表示に反映
@@ -1134,6 +1156,9 @@ function updateCalledNumbers() {
             }
         }
     }
+    
+    // 自動ビンゴチェック
+    autoCheckBingo();
     
     updateConnectionStatus('online');
 }
@@ -1180,5 +1205,3 @@ document.addEventListener('keydown', function(e) {
     }
 });
     </script>
-</body>
-</html>
