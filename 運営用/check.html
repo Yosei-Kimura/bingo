@@ -377,21 +377,9 @@
                 <button class="btn btn-warning" onclick="incrementBingo(-1)">-1人</button>
                 <button class="btn btn-danger" onclick="resetBingo()">リセット</button>
             </div>
-            
-            
-            <div class="notes-section">
-                <label for="notes">メモ:</label>
-                <textarea id="notes" placeholder="特記事項があれば記入してください..."></textarea>
-                <button class="btn btn-primary" onclick="saveNotes()">メモ保存</button>
-            </div>
         </div>
         
         <div id="messageArea"></div>
-        
-        <div class="status-info" id="statusInfo">
-            <div>最終更新: <span id="lastUpdated">未更新</span></div>
-            <div>出た番号数: <span id="numbersCount">0</span>個</div>
-        </div>
         
         <div class="numbers-display">
             <h3>📋 これまでに出た番号</h3>
@@ -416,6 +404,7 @@
         let sortMode = 'order';
         let currentBingoCount = 0;
         const API_BASE = '../api/bingo-check.php';
+        const DATA_API = '../api/get-data.php';
 
         // APIリクエスト関数
         async function apiRequest(action, data = {}) {
@@ -445,49 +434,23 @@
             }
         }
 
-        // データを読み込み
-        async function loadData() {
-            try {
-                const response = await fetch(API_BASE);
-                const result = await response.json();
-                
-                if (result.success) {
-                    currentBingoCount = result.bingoCount || 0;
-                    calledNumbers = result.calledNumbers || [];
-                    
-                    updateDisplay();
-                    
-                    // ステータス情報更新
-                    document.getElementById('lastUpdated').textContent = 
-                        result.lastUpdated ? new Date(result.lastUpdated).toLocaleString('ja-JP') : '未更新';
-                    document.getElementById('numbersCount').textContent = calledNumbers.length;
-                    document.getElementById('notes').value = result.notes || '';
-                    
-                    console.log('データ読み込み成功:', result);
-                } else {
-                    throw new Error(result.error || 'Failed to load data');
-                }
-            } catch (error) {
-                console.error('Load Error:', error);
-                showMessage('データの読み込みに失敗しました: ' + error.message, 'error');
-            }
-        }
-
-        // ビンゴ人数を増減
-        async function incrementBingo(increment) {
-            try {
-                const result = await apiRequest('increment', { increment: increment });
-                currentBingoCount = result.newCount;
-                updateDisplay();
-                showMessage(result.message, 'success');
-            } catch (error) {
-                // エラーは apiRequest 内で既に表示済み
-            }
+        // 表示を更新
+        function updateDisplay() {
+            // ビンゴ人数表示
+            document.getElementById('bingoCount').textContent = currentBingoCount;
+            
+            // 番号表示
+            displayNumbers();
         }
 
         // ビンゴ人数を手動設定
         async function updateManualCount() {
             const input = document.getElementById('manualCount');
+            if (!input) {
+                showMessage('入力フィールドが見つかりません', 'error');
+                return;
+            }
+            
             const count = parseInt(input.value);
             const notes = document.getElementById('notes').value;
             
@@ -507,16 +470,55 @@
             }
         }
 
-        // メモを保存
-        async function saveNotes() {
-            const notes = document.getElementById('notes').value;
-            
+        // データを読み込み（get-data.phpから番号データを取得）
+        async function loadData() {
             try {
-                const result = await apiRequest('update_count', { 
-                    count: currentBingoCount, 
-                    notes: notes 
-                });
-                showMessage('メモを保存しました', 'success');
+                // 番号データを取得
+                const numbersResponse = await fetch(DATA_API);
+                const numbersResult = await numbersResponse.json();
+                
+                if (numbersResult.success) {
+                    calledNumbers = numbersResult.numbers || numbersResult.calledNumbers || [];
+                    console.log('取得した番号:', calledNumbers);
+                } else {
+                    console.warn('番号データの取得に失敗:', numbersResult.error);
+                    calledNumbers = [];
+                }
+
+                // ビンゴチェックデータを取得
+                try {
+                    const checkResponse = await fetch(API_BASE);
+                    const checkResult = await checkResponse.json();
+                    
+                    if (checkResult.success) {
+                        currentBingoCount = checkResult.bingoCount || 0;
+                    }
+                } catch (checkError) {
+                    console.warn('ビンゴチェックデータの取得に失敗:', checkError);
+                    // ビンゴカウントのデフォルト値を設定
+                    currentBingoCount = 0;
+                }
+                
+                updateDisplay();
+                console.log('データの読み込みが完了しました');
+                
+            } catch (error) {
+                console.error('Load Error:', error);
+                showMessage('データの読み込みに失敗しました: ' + error.message, 'error');
+                // エラー時もデフォルト値を設定
+                calledNumbers = [];
+                currentBingoCount = 0;
+                updateDisplay();
+            }
+        }
+
+        // ビンゴ人数を増減
+        async function incrementBingo(increment) {
+            try {
+                const result = await apiRequest('increment', { increment: increment });
+                currentBingoCount = result.newCount;
+                updateDisplay();
+                showMessage(result.message, 'success');
             } catch (error) {
                 // エラーは apiRequest 内で既に表示済み
             }
@@ -529,7 +531,6 @@
                     const result = await apiRequest('reset');
                     currentBingoCount = 0;
                     updateDisplay();
-                    document.getElementById('notes').value = '';
                     showMessage(result.message, 'success');
                 } catch (error) {
                     // エラーは apiRequest 内で既に表示済み
@@ -547,16 +548,6 @@
             document.getElementById(`sortBy${mode.charAt(0).toUpperCase() + mode.slice(1)}`).classList.add('active');
             
             // 表示を更新
-            displayNumbers();
-        }
-
-        // 表示を更新
-        function updateDisplay() {
-            // ビンゴ人数表示
-            document.getElementById('bingoCount').textContent = currentBingoCount;
-            document.getElementById('manualCount').placeholder = currentBingoCount;
-            
-            // 番号表示
             displayNumbers();
         }
 
@@ -614,7 +605,10 @@
         }, 30000);
 
         // 初期読み込み
-        loadData();
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('ページ読み込み完了、データを取得します...');
+            loadData();
+        });
     </script>
 </body>
 </html>
