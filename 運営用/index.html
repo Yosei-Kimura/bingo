@@ -1,0 +1,674 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ビンゴ - 運営者用</title>
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: linear-gradient(135deg, #2c3e50 0%, #3498db 100%);
+            min-height: 100vh;
+        }
+
+        .container {
+            background: white;
+            border-radius: 15px;
+            padding: 30px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+            max-width: 1000px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            color: #2c3e50;
+            text-align: center;
+            margin-bottom: 30px;
+            font-size: 2.5em;
+        }
+
+        .control-panel {
+            background: #ecf0f1;
+            padding: 25px;
+            border-radius: 10px;
+            margin-bottom: 30px;
+        }
+
+        .input-section {
+            display: flex;
+            gap: 15px;
+            align-items: center;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+
+        .input-section label {
+            font-weight: bold;
+            color: #2c3e50;
+        }
+
+        .input-section input {
+            padding: 12px 15px;
+            font-size: 1.2em;
+            border: 2px solid #bdc3c7;
+            border-radius: 8px;
+            width: 100px;
+            text-align: center;
+        }
+
+        .btn {
+            padding: 12px 25px;
+            font-size: 1.1em;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: all 0.3s;
+        }
+
+        .btn-primary {
+            background: #27ae60;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #229954;
+            transform: translateY(-2px);
+        }
+
+        .btn-danger {
+            background: #e74c3c;
+            color: white;
+        }
+
+        .btn-danger:hover {
+            background: #c0392b;
+            transform: translateY(-2px);
+        }
+
+        .btn-warning {
+            background: #f39c12;
+            color: white;
+        }
+
+        .btn-warning:hover {
+            background: #e67e22;
+            transform: translateY(-2px);
+        }
+
+        .current-display {
+            text-align: center;
+            background: #fff;
+            border: 3px solid #3498db;
+            border-radius: 15px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+
+        .current-number {
+            font-size: 4em;
+            font-weight: bold;
+            color: #e74c3c;
+            margin: 10px 0;
+        }
+
+        .stats {
+            display: flex;
+            justify-content: space-around;
+            margin: 20px 0;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        .stat-item {
+            background: #34495e;
+            color: white;
+            padding: 15px;
+            border-radius: 10px;
+            text-align: center;
+            min-width: 120px;
+        }
+
+        .stat-number {
+            font-size: 2em;
+            font-weight: bold;
+            display: block;
+        }
+
+        .numbers-table {
+            margin-top: 30px;
+        }
+
+        .numbers-table h3 {
+            color: #2c3e50;
+            margin-bottom: 15px;
+        }
+
+        .numbers-grid {
+            display: grid;
+            grid-template-columns: repeat(10, 1fr);
+            gap: 8px;
+            margin: 20px 0;
+        }
+
+        .number-cell {
+            padding: 12px 8px;
+            text-align: center;
+            border: 2px solid #bdc3c7;
+            border-radius: 6px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .number-cell.called {
+            background: #27ae60;
+            color: white;
+            border-color: #27ae60;
+        }
+
+        .number-cell.latest {
+            background: #e74c3c;
+            color: white;
+            border-color: #e74c3c;
+            animation: pulse 1s infinite;
+        }
+
+        .number-cell:hover {
+            transform: scale(1.05);
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+            100% { transform: scale(1); }
+        }
+
+        .called-list {
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 20px;
+            margin-top: 20px;
+        }
+
+        .called-numbers-display {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-top: 15px;
+        }
+
+        .called-number-item {
+            background: #3498db;
+            color: white;
+            padding: 8px 12px;
+            border-radius: 20px;
+            font-weight: bold;
+            position: relative;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .called-number-item:hover {
+            background: #e74c3c;
+        }
+
+        .called-number-item.latest {
+            background: #e74c3c;
+            animation: bounce 0.5s;
+        }
+
+        @keyframes bounce {
+            0%, 20%, 53%, 80%, 100% { transform: translate3d(0,0,0); }
+            40%, 43% { transform: translate3d(0,-10px,0); }
+            70% { transform: translate3d(0,-5px,0); }
+            90% { transform: translate3d(0,-2px,0); }
+        }
+
+        .message {
+            padding: 15px;
+            border-radius: 8px;
+            margin: 10px 0;
+            font-weight: bold;
+        }
+
+        .message.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .message.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                padding: 15px;
+                margin: 10px;
+            }
+            
+            .input-section {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            
+            .input-section input {
+                width: 100%;
+            }
+            
+            .stats {
+                flex-direction: column;
+            }
+            
+            .numbers-grid {
+                grid-template-columns: repeat(5, 1fr);
+            }
+        }
+        .login-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+
+        .login-box {
+            background: white;
+            padding: 40px;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            text-align: center;
+            max-width: 400px;
+            width: 90%;
+        }
+
+        .login-box h2 {
+            color: #2c3e50;
+            margin-bottom: 30px;
+        }
+
+        .login-box input {
+            width: 100%;
+            padding: 15px;
+            font-size: 1.2em;
+            border: 2px solid #bdc3c7;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            box-sizing: border-box;
+        }
+
+        .login-box button {
+            width: 100%;
+            padding: 15px;
+            font-size: 1.2em;
+            background: #3498db;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+
+        .login-box button:hover {
+            background: #2980b9;
+        }
+
+        .login-error {
+            color: #e74c3c;
+            margin-top: 10px;
+            font-weight: bold;
+        }
+
+        .main-content {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <!-- パスワード認証画面 -->
+    <div class="login-overlay" id="loginOverlay">
+        <div class="login-box">
+            <h2>🔐 運営者認証</h2>
+            <p>運営者用ページにアクセスするにはパスワードが必要です</p>
+            <input type="password" id="passwordInput" placeholder="パスワードを入力してください" autocomplete="off">
+            <button onclick="checkPassword()">ログイン</button>
+            <div class="login-error" id="loginError"></div>
+        </div>
+    </div>
+
+    <div class="container main-content" id="mainContent">
+        <h1>🎯 ビンゴ大会 - 運営者用</h1>
+        
+        <div class="control-panel">
+            <div class="input-section">
+                <label for="numberInput">番号入力:</label>
+                <input type="number" id="numberInput" min="1" max="75" placeholder="1-75">
+                <button class="btn btn-primary" onclick="addNumber()">📢 番号を追加</button>
+                <button class="btn btn-warning" onclick="undoLastNumber()">↩️ 直前を取消</button>
+                <button class="btn btn-danger" onclick="resetAll()">🔄 全リセット</button>
+            </div>
+            
+            <div class="current-display">
+                <div>現在の番号</div>
+                <div class="current-number" id="currentNumber">-</div>
+            </div>
+            
+            <div class="stats">
+                <div class="stat-item">
+                    <span class="stat-number" id="totalCalled">0</span>
+                    <div>出た番号数</div>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-number" id="remaining">75</span>
+                    <div>残り番号数</div>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-number" id="progress">0</span>
+                    <div>進行率 (%)</div>
+                </div>
+            </div>
+        </div>
+        
+        <div id="messageArea"></div>
+        
+        <div class="numbers-table">
+            <h3>📊 ビンゴ番号表 (1-75)</h3>
+            <div class="numbers-grid" id="numbersGrid">
+                <!-- 番号グリッドがここに生成されます -->
+            </div>
+        </div>
+        
+        <div class="called-list">
+            <h3>📋 出た番号一覧 (新しい順)</h3>
+            <div class="called-numbers-display" id="calledNumbersList">
+                <!-- 出た番号がここに表示されます -->
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let calledNumbers = [];
+        const correctPassword = 'love_kf';
+        const API_BASE = '../api/admin.php';
+
+        // パスワード認証
+        function checkPassword() {
+            const passwordInput = document.getElementById('passwordInput');
+            const loginError = document.getElementById('loginError');
+            const password = passwordInput.value;
+
+            if (password === correctPassword) {
+                // 認証成功
+                document.getElementById('loginOverlay').style.display = 'none';
+                document.getElementById('mainContent').style.display = 'block';
+                
+                // セッションストレージに認証状態を保存
+                sessionStorage.setItem('bingoAuth', 'true');
+                
+                // 初期化
+                initializeGrid();
+                loadData();
+            } else {
+                // 認証失敗
+                loginError.textContent = 'パスワードが間違っています';
+                passwordInput.value = '';
+                passwordInput.focus();
+            }
+        }
+
+        // ページ読み込み時の認証チェック
+        function checkAuth() {
+            const isAuthenticated = sessionStorage.getItem('bingoAuth') === 'true';
+            
+            if (isAuthenticated) {
+                document.getElementById('loginOverlay').style.display = 'none';
+                document.getElementById('mainContent').style.display = 'block';
+                initializeGrid();
+                loadData();
+            } else {
+                document.getElementById('loginOverlay').style.display = 'flex';
+                document.getElementById('mainContent').style.display = 'none';
+                setTimeout(() => {
+                    document.getElementById('passwordInput').focus();
+                }, 100);
+            }
+        }
+
+        // APIリクエスト関数
+        async function apiRequest(action, data = {}) {
+            try {
+                const response = await fetch(API_BASE, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        action: action,
+                        ...data
+                    })
+                });
+
+                const result = await response.json();
+                
+                if (!result.success) {
+                    throw new Error(result.error || 'API request failed');
+                }
+                
+                return result;
+            } catch (error) {
+                console.error('API Error:', error);
+                showMessage('接続エラー: ' + error.message, 'error');
+                throw error;
+            }
+        }
+
+        // データをサーバーから読み込み
+        async function loadData() {
+            try {
+                const response = await fetch(API_BASE);
+                const result = await response.json();
+                
+                if (result.success) {
+                    calledNumbers = result.numbers || [];
+                    updateDisplay();
+                    showMessage('データを読み込みました', 'success');
+                } else {
+                    throw new Error(result.error || 'Failed to load data');
+                }
+            } catch (error) {
+                console.error('Load Error:', error);
+                showMessage('データの読み込みに失敗しました: ' + error.message, 'error');
+                // フォールバック: ローカルストレージから読み込み
+                const stored = localStorage.getItem('bingoCalledNumbers');
+                if (stored) {
+                    calledNumbers = JSON.parse(stored);
+                    updateDisplay();
+                }
+            }
+        }
+
+        function initializeGrid() {
+            const grid = document.getElementById('numbersGrid');
+            grid.innerHTML = '';
+            
+            for (let i = 1; i <= 75; i++) {
+                const cell = document.createElement('div');
+                cell.className = 'number-cell';
+                cell.textContent = i;
+                cell.id = `cell-${i}`;
+                cell.onclick = () => toggleNumber(i);
+                grid.appendChild(cell);
+            }
+        }
+
+        function toggleNumber(number) {
+            if (calledNumbers.includes(number)) {
+                removeNumber(number);
+            } else {
+                addNumberToServer(number);
+            }
+        }
+
+        async function addNumber() {
+            const input = document.getElementById('numberInput');
+            const number = parseInt(input.value);
+            
+            if (isNaN(number) || number < 1 || number > 75) {
+                showMessage('1から75の数字を入力してください', 'error');
+                return;
+            }
+            
+            if (calledNumbers.includes(number)) {
+                showMessage(`番号 ${number} は既に出ています`, 'error');
+                return;
+            }
+            
+            input.value = '';
+            await addNumberToServer(number);
+        }
+
+        async function addNumberToServer(number) {
+            try {
+                const result = await apiRequest('add', { number: number });
+                await loadData(); // データを再読み込み
+                showMessage(result.message, 'success');
+            } catch (error) {
+                // エラーは apiRequest 内で既に表示済み
+            }
+        }
+
+        async function removeNumber(number) {
+            try {
+                const result = await apiRequest('remove', { number: number });
+                await loadData(); // データを再読み込み
+                showMessage(result.message, 'success');
+            } catch (error) {
+                // エラーは apiRequest 内で既に表示済み
+            }
+        }
+
+        async function undoLastNumber() {
+            if (calledNumbers.length === 0) {
+                showMessage('取り消す番号がありません', 'error');
+                return;
+            }
+            
+            try {
+                const result = await apiRequest('undo');
+                await loadData(); // データを再読み込み
+                showMessage(result.message, 'success');
+            } catch (error) {
+                // エラーは apiRequest 内で既に表示済み
+            }
+        }
+
+        async function resetAll() {
+            if (confirm('本当に全ての番号をリセットしますか？')) {
+                try {
+                    const result = await apiRequest('reset');
+                    await loadData(); // データを再読み込み
+                    showMessage(result.message, 'success');
+                } catch (error) {
+                    // エラーは apiRequest 内で既に表示済み
+                }
+            }
+        }
+
+        function saveAndUpdate() {
+            // ローカルストレージにもバックアップとして保存
+            localStorage.setItem('bingoCalledNumbers', JSON.stringify(calledNumbers));
+            localStorage.setItem('bingoLastUpdate', Date.now().toString());
+            
+            updateDisplay();
+        }
+
+        function updateDisplay() {
+            // 現在の番号表示
+            const currentNumberEl = document.getElementById('currentNumber');
+            if (calledNumbers.length > 0) {
+                currentNumberEl.textContent = calledNumbers[calledNumbers.length - 1];
+            } else {
+                currentNumberEl.textContent = '-';
+            }
+            
+            // 統計更新
+            document.getElementById('totalCalled').textContent = calledNumbers.length;
+            document.getElementById('remaining').textContent = 75 - calledNumbers.length;
+            document.getElementById('progress').textContent = Math.round((calledNumbers.length / 75) * 100);
+            
+            // グリッド更新
+            for (let i = 1; i <= 75; i++) {
+                const cell = document.getElementById(`cell-${i}`);
+                if (calledNumbers.includes(i)) {
+                    cell.className = 'number-cell called';
+                    // 最新の番号をハイライト
+                    if (i === calledNumbers[calledNumbers.length - 1]) {
+                        cell.className = 'number-cell latest';
+                    }
+                } else {
+                    cell.className = 'number-cell';
+                }
+            }
+            
+            // 出た番号一覧更新
+            const calledList = document.getElementById('calledNumbersList');
+            calledList.innerHTML = '';
+            
+            [...calledNumbers].reverse().forEach((number, index) => {
+                const span = document.createElement('span');
+                span.className = 'called-number-item';
+                span.textContent = number;
+                span.onclick = () => removeNumber(number);
+                span.title = 'クリックで削除';
+                
+                if (index === 0) {
+                    span.className += ' latest';
+                }
+                
+                calledList.appendChild(span);
+            });
+        }
+
+        function showMessage(text, type) {
+            const messageArea = document.getElementById('messageArea');
+            const message = document.createElement('div');
+            message.className = `message ${type}`;
+            message.textContent = text;
+            
+            messageArea.innerHTML = '';
+            messageArea.appendChild(message);
+            
+            setTimeout(() => {
+                messageArea.innerHTML = '';
+            }, 3000);
+        }
+
+        // Enter キーで番号追加
+        document.getElementById('numberInput').addEventListener('keypress', function(event) {
+            if (event.key === 'Enter') {
+                addNumber();
+            }
+        });
+
+        // パスワード入力でEnterキー
+        document.getElementById('passwordInput').addEventListener('keypress', function(event) {
+            if (event.key === 'Enter') {
+                checkPassword();
+            }
+        });
+
+        // ページ読み込み時に認証チェック
+        checkAuth();
+    </script>
+</body>
+</html>

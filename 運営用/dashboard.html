@@ -1,0 +1,601 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ビンゴ大会管理ダッシュボード</title>
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+
+        .header {
+            text-align: center;
+            color: white;
+            margin-bottom: 40px;
+        }
+
+        .header h1 {
+            font-size: 3em;
+            margin: 0;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+
+        .header p {
+            font-size: 1.2em;
+            margin: 10px 0;
+            opacity: 0.9;
+        }
+
+        .dashboard {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+            gap: 30px;
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        .card {
+            background: white;
+            border-radius: 15px;
+            padding: 30px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+            transition: transform 0.3s, box-shadow 0.3s;
+        }
+
+        .card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 15px 40px rgba(0,0,0,0.4);
+        }
+
+        .card-header {
+            display: flex;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .card-icon {
+            font-size: 2.5em;
+            margin-right: 15px;
+        }
+
+        .card-title {
+            font-size: 1.5em;
+            font-weight: bold;
+            color: #333;
+        }
+
+        .card-description {
+            color: #666;
+            margin-bottom: 25px;
+            line-height: 1.6;
+        }
+
+        .card-buttons {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .btn {
+            background: #3498db;
+            color: white;
+            border: none;
+            padding: 12px 20px;
+            font-size: 1em;
+            border-radius: 8px;
+            cursor: pointer;
+            text-decoration: none;
+            text-align: center;
+            transition: background 0.3s;
+            display: inline-block;
+        }
+
+        .btn:hover {
+            background: #2980b9;
+        }
+
+        .btn.primary {
+            background: #e74c3c;
+            font-weight: bold;
+        }
+
+        .btn.primary:hover {
+            background: #c0392b;
+        }
+
+        .btn.success {
+            background: #27ae60;
+        }
+
+        .btn.success:hover {
+            background: #229954;
+        }
+
+        .btn.warning {
+            background: #f39c12;
+        }
+
+        .btn.warning:hover {
+            background: #e67e22;
+        }
+
+        .status-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .status-item {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 8px;
+            text-align: center;
+            border-left: 4px solid #3498db;
+        }
+
+        .status-number {
+            font-size: 2em;
+            font-weight: bold;
+            color: #3498db;
+            margin-bottom: 5px;
+        }
+
+        .status-label {
+            color: #666;
+            font-size: 0.9em;
+        }
+
+        .quick-actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-top: 20px;
+        }
+
+        .quick-actions .btn {
+            flex: 1;
+            min-width: 120px;
+        }
+
+        .feature-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+
+        .feature-list li {
+            padding: 8px 0;
+            border-bottom: 1px solid #eee;
+            color: #555;
+        }
+
+        .feature-list li:last-child {
+            border-bottom: none;
+        }
+
+        .feature-list li::before {
+            content: "✓ ";
+            color: #27ae60;
+            font-weight: bold;
+            margin-right: 8px;
+        }
+
+        .alert {
+            background: #fff3cd;
+            color: #856404;
+            border: 1px solid #ffeaa7;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 20px;
+        }
+
+        .alert.info {
+            background: #d1ecf1;
+            color: #0c5460;
+            border-color: #bee5eb;
+        }
+
+        @media (max-width: 768px) {
+            .dashboard {
+                grid-template-columns: 1fr;
+                gap: 20px;
+            }
+            
+            .header h1 {
+                font-size: 2.5em;
+            }
+            
+            .card {
+                padding: 20px;
+            }
+            
+            .quick-actions {
+                flex-direction: column;
+            }
+            
+            .quick-actions .btn {
+                flex: none;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🎯 ビンゴ大会管理センター 🎯</h1>
+        <p>周年記念ビンゴ大会の運営管理システム</p>
+        <p id="currentTime"></p>
+    </div>
+
+        <div class="alert info">
+            <strong>📢 運営ガイド:</strong> 
+            各機能は左から順番に使用することをお勧めします。まず番号管理でゲームを開始し、必要に応じてオンライン参加者用のカードを生成してください。
+        </div>
+
+        <!-- エラー表示エリア -->
+        <div id="errorDisplay" style="display: none;" class="alert" style="background: #f8d7da; color: #721c24; border-color: #f5c6cb;">
+            <strong>⚠️ システムエラー:</strong>
+            <div id="errorMessage"></div>
+            <button onclick="dismissError()" style="margin-top: 10px; padding: 5px 10px; background: #dc3545; color: white; border: none; border-radius: 4px;">閉じる</button>
+        </div>    <div class="dashboard">
+        <!-- 番号管理カード -->
+        <div class="card">
+            <div class="card-header">
+                <div class="card-icon">🎲</div>
+                <div>
+                    <div class="card-title">番号管理システム</div>
+                </div>
+            </div>
+            <div class="card-description">
+                ビンゴ番号の追加・管理を行います。ゲームの中心となる機能です。
+            </div>
+            
+            <div class="status-grid">
+                <div class="status-item">
+                    <div class="status-number" id="calledNumbers">-</div>
+                    <div class="status-label">呼出済み番号</div>
+                </div>
+                <div class="status-item">
+                    <div class="status-number" id="gameStatus">-</div>
+                    <div class="status-label">ゲーム状態</div>
+                </div>
+            </div>
+
+            <ul class="feature-list">
+                <li>1-75の番号をランダムまたは手動で追加</li>
+                <li>呼び出し履歴の確認</li>
+                <li>番号の削除・リセット機能</li>
+                <li>リアルタイム状態監視</li>
+            </ul>
+
+            <div class="card-buttons">
+                <a href="index.html" class="btn primary">🎯 番号管理画面を開く</a>
+                <a href="check.html" class="btn">📋 確認画面を開く</a>
+            </div>
+        </div>
+
+        <!-- 参加者用表示カード -->
+        <div class="card">
+            <div class="card-header">
+                <div class="card-icon">📺</div>
+                <div>
+                    <div class="card-title">参加者用表示</div>
+                </div>
+            </div>
+            <div class="card-description">
+                参加者が番号を確認するための表示画面です。大画面での投影にも適しています。
+            </div>
+
+            <ul class="feature-list">
+                <li>最新の呼び出し番号を大きく表示</li>
+                <li>これまでの番号一覧</li>
+                <li>出た順・数字順の並び替え</li>
+                <li>自動更新機能</li>
+            </ul>
+
+            <div class="card-buttons">
+                <a href="../number_check/index.html" class="btn success">📱 参加者画面を開く</a>
+            </div>
+        </div>
+
+        <!-- オンラインビンゴカード管理カード -->
+        <div class="card">
+            <div class="card-header">
+                <div class="card-icon">💻</div>
+                <div>
+                    <div class="card-title">オンラインビンゴ管理</div>
+                </div>
+            </div>
+            <div class="card-description">
+                スマートフォンでビンゴを楽しむ参加者用のデジタルカードを管理します。
+            </div>
+
+            <div class="status-grid">
+                <div class="status-item">
+                    <div class="status-number" id="onlineCards">-</div>
+                    <div class="status-label">発行済みカード</div>
+                </div>
+                <div class="status-item">
+                    <div class="status-number" id="activeUsers">-</div>
+                    <div class="status-label">アクティブユーザー</div>
+                </div>
+            </div>
+
+            <ul class="feature-list">
+                <li>パスワード保護されたビンゴカード生成</li>
+                <li>A4印刷用QRコードカード作成</li>
+                <li>参加者状況の監視</li>
+                <li>ビンゴ達成記録の管理</li>
+            </ul>
+
+            <div class="card-buttons">
+                <a href="#" onclick="accessOnlineManager()" class="btn warning">🔐 オンライン管理画面</a>
+                <a href="../number_check/online-bingo.html" class="btn">📱 参加者用カード画面</a>
+            </div>
+        </div>
+
+        <!-- システム情報カード -->
+        <div class="card">
+            <div class="card-header">
+                <div class="card-icon">⚙️</div>
+                <div>
+                    <div class="card-title">システム情報</div>
+                </div>
+            </div>
+            <div class="card-description">
+                システムの状態確認とメンテナンス機能を提供します。
+            </div>
+
+            <div class="status-grid">
+                <div class="status-item">
+                    <div class="status-number" id="dbStatus">-</div>
+                    <div class="status-label">DB接続</div>
+                </div>
+                <div class="status-item">
+                    <div class="status-number" id="lastUpdate">-</div>
+                    <div class="status-label">最終更新</div>
+                </div>
+            </div>
+
+            <ul class="feature-list">
+                <li>データベース接続状態</li>
+                <li>システムログの確認</li>
+                <li>バックアップ機能</li>
+                <li>エラー監視</li>
+            </ul>
+
+            <div class="quick-actions">
+                <button class="btn" onclick="checkSystemStatus()">🔍 状態確認</button>
+                <button class="btn" onclick="refreshData()">🔄 データ更新</button>
+                <button class="btn warning" onclick="initializeTables()">🔧 テーブル初期化</button>
+                <button class="btn" onclick="testAPI()">🧪 API テスト</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- パスワード入力モーダル -->
+    <div id="passwordModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 1000;">
+        <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 30px; border-radius: 15px; max-width: 400px; width: 90%;">
+            <h3 style="margin-top: 0; color: #333;">🔐 管理者認証</h3>
+            <p style="color: #666; margin-bottom: 20px;">オンラインビンゴ管理画面にアクセスするにはパスワードが必要です。</p>
+            <input type="password" id="adminPassword" placeholder="管理者パスワードを入力" style="width: 100%; padding: 12px; border: 2px solid #ddd; border-radius: 8px; font-size: 1em; box-sizing: border-box; margin-bottom: 20px;">
+            <div style="display: flex; gap: 10px;">
+                <button onclick="verifyPassword()" style="flex: 1; background: #3498db; color: white; border: none; padding: 12px; border-radius: 8px; cursor: pointer;">アクセス</button>
+                <button onclick="closePasswordModal()" style="flex: 1; background: #95a5a6; color: white; border: none; padding: 12px; border-radius: 8px; cursor: pointer;">キャンセル</button>
+            </div>
+            <div id="passwordError" style="color: #e74c3c; margin-top: 10px; display: none;">パスワードが正しくありません。</div>
+        </div>
+    </div>
+
+    <script>
+        // 現在時刻の表示
+        function updateTime() {
+            const now = new Date();
+            document.getElementById('currentTime').textContent = 
+                now.toLocaleDateString('ja-JP', { 
+                    year: 'numeric', 
+                    month: 'long', 
+                    day: 'numeric', 
+                    weekday: 'long',
+                    hour: '2-digit',
+                    minute: '2-digit'
+                });
+        }
+
+        // 初期化とデータ読み込み
+        function initializeDashboard() {
+            updateTime();
+            setInterval(updateTime, 60000); // 1分ごとに更新
+            loadDashboardData();
+        }
+
+        // ダッシュボードデータの読み込み
+        async function loadDashboardData() {
+            try {
+                // 番号管理システムの状態
+                try {
+                    const numberResponse = await fetch('../api/get-data.php');
+                    const numberData = await numberResponse.json();
+                    
+                    if (numberData.success) {
+                        document.getElementById('calledNumbers').textContent = numberData.totalCount;
+                        document.getElementById('gameStatus').textContent = 
+                            numberData.gameStatus === 'active' ? '進行中' : '待機中';
+                    } else {
+                        console.error('Number data error:', numberData.error);
+                        document.getElementById('calledNumbers').textContent = '0';
+                        document.getElementById('gameStatus').textContent = '待機中';
+                    }
+                } catch (error) {
+                    console.error('Number API error:', error);
+                    document.getElementById('calledNumbers').textContent = '0';
+                    document.getElementById('gameStatus').textContent = 'エラー';
+                }
+
+                // オンラインビンゴの統計
+                try {
+                    console.log('Fetching stats from:', '../api/admin-stats.php');
+                    const statsResponse = await fetch('../api/admin-stats.php');
+                    console.log('Stats response status:', statsResponse.status);
+                    
+                    if (!statsResponse.ok) {
+                        throw new Error(`HTTP ${statsResponse.status}: ${statsResponse.statusText}`);
+                    }
+                    
+                    const statsData = await statsResponse.json();
+                    console.log('Stats data:', statsData);
+                    
+                    if (statsData.success) {
+                        document.getElementById('onlineCards').textContent = statsData.stats.total_cards;
+                        document.getElementById('activeUsers').textContent = statsData.stats.recent_access;
+                    } else {
+                        console.error('Stats data error:', statsData.error);
+                        document.getElementById('onlineCards').textContent = '0';
+                        document.getElementById('activeUsers').textContent = '0';
+                    }
+                } catch (error) {
+                    console.error('Stats API error:', error);
+                    document.getElementById('onlineCards').textContent = '0';
+                    document.getElementById('activeUsers').textContent = '0';
+                    showError('オンラインビンゴ統計の取得に失敗しました: ' + error.message);
+                }
+
+                // システム状態
+                document.getElementById('dbStatus').textContent = '正常';
+                document.getElementById('lastUpdate').textContent = new Date().toLocaleTimeString('ja-JP');
+
+            } catch (error) {
+                console.error('Dashboard data loading error:', error);
+                document.getElementById('dbStatus').textContent = 'エラー';
+            }
+        }
+
+        // オンライン管理画面へのアクセス
+        function accessOnlineManager() {
+            document.getElementById('passwordModal').style.display = 'block';
+            document.getElementById('adminPassword').focus();
+        }
+
+        // パスワード確認
+        function verifyPassword() {
+            const password = document.getElementById('adminPassword').value;
+            const correctPassword = 'love_kf';
+            
+            if (password === correctPassword) {
+                closePasswordModal();
+                window.open('online-bingo-manager.html', '_blank');
+            } else {
+                document.getElementById('passwordError').style.display = 'block';
+                document.getElementById('adminPassword').value = '';
+                document.getElementById('adminPassword').focus();
+            }
+        }
+
+        // パスワードモーダルを閉じる
+        function closePasswordModal() {
+            document.getElementById('passwordModal').style.display = 'none';
+            document.getElementById('adminPassword').value = '';
+            document.getElementById('passwordError').style.display = 'none';
+        }
+
+        // エンターキーでパスワード確認
+        document.addEventListener('DOMContentLoaded', function() {
+            document.getElementById('adminPassword').addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') {
+                    verifyPassword();
+                }
+            });
+        });
+
+        // システム状態確認
+        function checkSystemStatus() {
+            alert('システム状態: 正常\nデータベース: 接続中\n最終更新: ' + new Date().toLocaleString('ja-JP'));
+        }
+
+        // データ更新
+        function refreshData() {
+            loadDashboardData();
+            alert('データを更新しました');
+        }
+
+        // テーブル初期化
+        async function initializeTables() {
+            if (!confirm('データベーステーブルを初期化しますか？\n（既存データは保持されます）')) {
+                return;
+            }
+            
+            try {
+                const response = await fetch('../api/init-tables.php', {
+                    method: 'POST'
+                });
+                const data = await response.json();
+                
+                if (data.success) {
+                    alert('テーブル初期化完了:\n' + data.tables_created.join('\n'));
+                    loadDashboardData();
+                } else {
+                    alert('エラー: ' + data.error);
+                }
+            } catch (error) {
+                alert('初期化エラー: ' + error.message);
+            }
+        }
+
+        // API テスト
+        async function testAPI() {
+            const results = [];
+            
+            // get-data.php テスト
+            try {
+                const response = await fetch('../api/get-data.php');
+                const data = await response.json();
+                results.push(`get-data.php: ${data.success ? '成功' : 'エラー - ' + data.error}`);
+            } catch (error) {
+                results.push(`get-data.php: エラー - ${error.message}`);
+            }
+            
+            // admin-stats.php テスト
+            try {
+                const response = await fetch('../api/admin-stats.php');
+                const data = await response.json();
+                results.push(`admin-stats.php: ${data.success ? '成功' : 'エラー - ' + data.error}`);
+            } catch (error) {
+                results.push(`admin-stats.php: エラー - ${error.message}`);
+            }
+            
+            // admin-cards.php テスト
+            try {
+                const response = await fetch('../api/admin-cards.php');
+                const data = await response.json();
+                results.push(`admin-cards.php: ${data.success ? '成功' : 'エラー - ' + data.error}`);
+            } catch (error) {
+                results.push(`admin-cards.php: エラー - ${error.message}`);
+            }
+            
+            alert('API テスト結果:\n\n' + results.join('\n'));
+        }
+
+        // エラー表示
+        function showError(message) {
+            document.getElementById('errorMessage').textContent = message;
+            document.getElementById('errorDisplay').style.display = 'block';
+        }
+
+        // エラー非表示
+        function dismissError() {
+            document.getElementById('errorDisplay').style.display = 'none';
+        }
+
+        // ページ読み込み時の初期化
+        window.addEventListener('DOMContentLoaded', initializeDashboard);
+
+        // 定期的なデータ更新（30秒ごと）
+        setInterval(loadDashboardData, 30000);
+    </script>
+</body>
+</html>

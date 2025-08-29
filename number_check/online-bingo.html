@@ -1,0 +1,1050 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>オンラインビンゴカード</title>
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .container {
+            background: white;
+            border-radius: 15px;
+            padding: 30px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+            text-align: center;
+            max-width: 600px;
+            width: 100%;
+        }
+
+        h1 {
+            color: #333;
+            margin-bottom: 30px;
+            font-size: 2.5em;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.1);
+        }
+
+        /* ログイン画面 */
+        .login-section {
+            display: block;
+        }
+
+        .login-form {
+            max-width: 400px;
+            margin: 0 auto;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+            text-align: left;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: bold;
+            color: #333;
+        }
+
+        .form-group input {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            font-size: 1em;
+            box-sizing: border-box;
+        }
+
+        .form-group input:focus {
+            outline: none;
+            border-color: #3498db;
+        }
+
+        .login-btn {
+            background: #3498db;
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            font-size: 1.1em;
+            border-radius: 8px;
+            cursor: pointer;
+            width: 100%;
+            transition: background 0.3s;
+        }
+
+        .login-btn:hover {
+            background: #2980b9;
+        }
+
+        .login-btn:disabled {
+            background: #95a5a6;
+            cursor: not-allowed;
+        }
+
+        /* ビンゴカード画面 */
+        .bingo-section {
+            display: none;
+        }
+
+        .participant-info {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            border-left: 4px solid #3498db;
+        }
+
+        .current-number {
+            font-size: 3em;
+            font-weight: bold;
+            color: #e74c3c;
+            margin: 20px 0;
+            padding: 15px;
+            border: 3px solid #e74c3c;
+            border-radius: 10px;
+            background: #fff5f5;
+            min-height: 60px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .bingo-card {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 3px;
+            max-width: 400px;
+            margin: 30px auto;
+            border: 3px solid #333;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        .bingo-header {
+            background: #333;
+            color: white;
+            padding: 10px;
+            font-size: 1.5em;
+            font-weight: bold;
+        }
+
+        .bingo-cell {
+            aspect-ratio: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.2em;
+            font-weight: bold;
+            background: white;
+            border: 1px solid #ddd;
+            cursor: pointer;
+            transition: all 0.3s;
+            user-select: none;
+        }
+
+        .bingo-cell.free {
+            background: #f39c12;
+            color: white;
+            font-size: 1em;
+        }
+
+        .bingo-cell.called {
+            background: #27ae60;
+            color: white;
+            transform: scale(0.95);
+        }
+
+        .bingo-cell.marked {
+            background: #e74c3c;
+            color: white;
+            transform: scale(0.95);
+        }
+
+        .bingo-cell:hover:not(.called):not(.free) {
+            background: #ecf0f1;
+        }
+
+        .controls {
+            margin-top: 20px;
+        }
+
+        .refresh-btn {
+            background: #3498db;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            font-size: 1em;
+            border-radius: 8px;
+            cursor: pointer;
+            margin: 5px;
+            transition: background 0.3s;
+        }
+
+        .refresh-btn:hover {
+            background: #2980b9;
+        }
+
+        .bingo-btn {
+            background: #e74c3c;
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            font-size: 1.2em;
+            font-weight: bold;
+            border-radius: 8px;
+            cursor: pointer;
+            margin: 10px;
+            transition: all 0.3s;
+        }
+
+        .bingo-btn:hover {
+            background: #c0392b;
+            transform: scale(1.05);
+        }
+
+        .bingo-btn:disabled {
+            background: #95a5a6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .status {
+            margin: 15px 0;
+            padding: 10px;
+            border-radius: 8px;
+            font-weight: bold;
+        }
+
+        .status.info {
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+
+        .status.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .status.warning {
+            background: #fff3cd;
+            color: #856404;
+            border: 1px solid #ffeaa7;
+        }
+
+        .status.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        .connection-status {
+            position: fixed;
+            top: 10px;
+            right: 10px;
+            padding: 8px 15px;
+            border-radius: 20px;
+            font-size: 0.9em;
+            font-weight: bold;
+            z-index: 1000;
+        }
+        
+        .connection-status.online {
+            background: #27ae60;
+            color: white;
+        }
+        
+        .connection-status.offline {
+            background: #e74c3c;
+            color: white;
+        }
+        
+        .connection-status.connecting {
+            background: #f39c12;
+            color: white;
+        }
+
+        .bingo-cell.bingo-line {
+            background: #f39c12 !important;
+            animation: pulse 1s infinite;
+            border: 3px solid #e67e22;
+            transform: scale(1.1);
+            z-index: 10;
+        }
+        
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.7; }
+            100% { opacity: 1; }
+        }
+        
+        /* ビンゴポップアップ */
+        .bingo-popup {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.3s ease;
+        }
+        
+        .bingo-popup.show {
+            opacity: 1;
+            visibility: visible;
+        }
+        
+        .bingo-popup-content {
+            background: white;
+            border-radius: 20px;
+            padding: 40px;
+            text-align: center;
+            max-width: 500px;
+            width: 90%;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+            transform: scale(0.5);
+            transition: transform 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .bingo-popup.show .bingo-popup-content {
+            transform: scale(1);
+        }
+        
+        .bingo-popup-header {
+            font-size: 3em;
+            margin-bottom: 20px;
+            color: #e74c3c;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.1);
+            animation: bounce 1s infinite;
+        }
+        
+        @keyframes bounce {
+            0%, 20%, 50%, 80%, 100% { transform: translateY(0); }
+            40% { transform: translateY(-10px); }
+            60% { transform: translateY(-5px); }
+        }
+        
+        .bingo-popup-message {
+            font-size: 1.3em;
+            margin-bottom: 30px;
+            color: #333;
+            line-height: 1.6;
+        }
+        
+        .bingo-lines-list {
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 20px;
+            margin: 20px 0;
+            border-left: 5px solid #e74c3c;
+        }
+        
+        .bingo-line-item {
+            font-size: 1.1em;
+            margin: 10px 0;
+            color: #2c3e50;
+            font-weight: bold;
+        }
+        
+        .bingo-line-item::before {
+            content: "✨ ";
+            margin-right: 10px;
+        }
+        
+        .bingo-popup-close {
+            background: #3498db;
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            font-size: 1.1em;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.3s;
+            margin-top: 20px;
+        }
+        
+        .bingo-popup-close:hover {
+            background: #2980b9;
+            transform: scale(1.05);
+        }
+        
+        .confetti {
+            position: absolute;
+            width: 10px;
+            height: 10px;
+            background: #f39c12;
+            animation: confetti-fall 3s linear infinite;
+        }
+        
+        @keyframes confetti-fall {
+            0% {
+                transform: translateY(-100vh) rotate(0deg);
+                opacity: 1;
+            }
+            100% {
+                transform: translateY(100vh) rotate(720deg);
+                opacity: 0;
+            }
+        }
+        
+        .confetti:nth-child(1) { left: 10%; background: #e74c3c; animation-delay: 0s; }
+        .confetti:nth-child(2) { left: 20%; background: #3498db; animation-delay: 0.5s; }
+        .confetti:nth-child(3) { left: 30%; background: #2ecc71; animation-delay: 1s; }
+        .confetti:nth-child(4) { left: 40%; background: #f39c12; animation-delay: 1.5s; }
+        .confetti:nth-child(5) { left: 50%; background: #9b59b6; animation-delay: 2s; }
+        .confetti:nth-child(6) { left: 60%; background: #e67e22; animation-delay: 2.5s; }
+        .confetti:nth-child(7) { left: 70%; background: #1abc9c; animation-delay: 3s; }
+        .confetti:nth-child(8) { left: 80%; background: #e91e63; animation-delay: 3.5s; }
+        .confetti:nth-child(9) { left: 90%; background: #34495e; animation-delay: 4s; }
+        
+        @media (max-width: 600px) {
+            .container {
+                padding: 20px;
+                margin: 10px;
+            }
+            
+            h1 {
+                font-size: 2em;
+            }
+            
+            .current-number {
+                font-size: 2.5em;
+            }
+            
+            .bingo-card {
+                max-width: 350px;
+            }
+            
+            .bingo-cell {
+                font-size: 1em;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="connection-status" id="connectionStatus">接続中...</div>
+    
+    <div class="container">
+        <h1>🎯 オンラインビンゴ 🎯</h1>
+        
+        <!-- ログイン画面 -->
+        <div class="login-section" id="loginSection">
+            <div class="login-form">
+                <div class="form-group">
+                    <label for="password">パスワード</label>
+                    <input type="password" id="password" placeholder="配布されたパスワードを入力してください" />
+                </div>
+                <div class="form-group">
+                    <label for="participantName">お名前（任意）</label>
+                    <input type="text" id="participantName" placeholder="お名前を入力してください" />
+                </div>
+                <button class="login-btn" id="loginBtn" onclick="login()">ビンゴカードを取得</button>
+            </div>
+            <div class="status info">
+                運営から配布されたパスワードを入力してください。<br>
+                既にカードをお持ちの場合は、同じパスワードで再ログインできます。
+            </div>
+        </div>
+        
+        <!-- ビンゴカード画面 -->
+        <div class="bingo-section" id="bingoSection">
+            <div class="participant-info" id="participantInfo">
+                <!-- 参加者情報がここに表示されます -->
+            </div>
+            
+            <div class="current-number" id="currentNumber">
+                待機中
+            </div>
+            
+            <!-- ビンゴカード -->
+            <div class="bingo-card" id="bingoCard">
+                <!-- ヘッダー -->
+                <div class="bingo-header">B</div>
+                <div class="bingo-header">I</div>
+                <div class="bingo-header">N</div>
+                <div class="bingo-header">G</div>
+                <div class="bingo-header">O</div>
+                
+                <!-- カードの中身がここに動的に生成されます -->
+            </div>
+            
+            <div class="controls">
+                <button class="refresh-btn" onclick="loadCalledNumbers()">🔄 番号更新</button>
+                <button class="bingo-btn" onclick="checkBingo()">🎉 ビンゴ！</button>
+            </div>
+            
+            <div class="status info" id="gameStatus">
+                番号が呼ばれたら、カードの該当する数字をクリックしてマークしてください。
+            </div>
+        </div>
+    </div>
+
+    <!-- ビンゴポップアップ -->
+    <div class="bingo-popup" id="bingoPopup">
+        <div class="bingo-popup-content">
+            <!-- 紙吹雪エフェクト -->
+            <div class="confetti"></div>
+            <div class="confetti"></div>
+            <div class="confetti"></div>
+            <div class="confetti"></div>
+            <div class="confetti"></div>
+            <div class="confetti"></div>
+            <div class="confetti"></div>
+            <div class="confetti"></div>
+            <div class="confetti"></div>
+            
+            <div class="bingo-popup-header" id="bingoPopupHeader">
+                🎉 ビンゴ！ 🎉
+            </div>
+            <div class="bingo-popup-message" id="bingoPopupMessage">
+                おめでとうございます！
+            </div>
+            <div class="bingo-lines-list" id="bingoLinesList">
+                <!-- ビンゴラインの詳細がここに表示されます -->
+            </div>
+            <button class="bingo-popup-close" onclick="closeBingoPopup()">
+                🎊 閉じる 🎊
+            </button>
+        </div>
+    </div>
+
+    <script>
+        let currentCard = null;
+        let calledNumbers = [];
+        let bingoCheckInterval = null;
+        let lastBingoCheck = null; // 最後にビンゴチェックした番号リスト
+
+        // ログイン処理
+        async function login() {
+            const password = document.getElementById('password').value.trim();
+            const participantName = document.getElementById('participantName').value.trim();
+            const loginBtn = document.getElementById('loginBtn');
+            
+            if (!password) {
+                showStatus('パスワードを入力してください。', 'error');
+                return;
+            }
+            
+            loginBtn.disabled = true;
+            loginBtn.textContent = '取得中...';
+            
+            try {
+                const response = await fetch('../api/card-manager.php', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        password: password,
+                        participant_name: participantName
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    currentCard = data.card;
+                    showBingoCard();
+                    initializeGame();
+                    
+                    if (data.action === 'new_card') {
+                        showStatus('新しいビンゴカードを作成しました！', 'success');
+                    } else {
+                        showStatus('既存のビンゴカードを読み込みました。', 'info');
+                    }
+                } else {
+                    showStatus(data.error || 'カードの取得に失敗しました。', 'error');
+                }
+                
+            } catch (error) {
+                console.error('Login error:', error);
+                showStatus('サーバーとの接続に失敗しました。', 'error');
+            } finally {
+                loginBtn.disabled = false;
+                loginBtn.textContent = 'ビンゴカードを取得';
+            }
+        }
+
+        // ビンゴカード画面を表示
+        function showBingoCard() {
+            document.getElementById('loginSection').style.display = 'none';
+            document.getElementById('bingoSection').style.display = 'block';
+            
+            // 参加者情報を表示
+            const participantInfo = document.getElementById('participantInfo');
+            participantInfo.innerHTML = `
+                <strong>パスワード:</strong> ${currentCard.password}<br>
+                ${currentCard.participant_name ? `<strong>お名前:</strong> ${currentCard.participant_name}<br>` : ''}
+                <strong>カード作成日時:</strong> ${new Date(currentCard.created_at).toLocaleString('ja-JP')}
+            `;
+            
+            // ビンゴカードを描画
+            renderBingoCard();
+        }
+
+        // ビンゴカードを描画
+        function renderBingoCard() {
+            const bingoCard = document.getElementById('bingoCard');
+            const cardData = currentCard.card_data;
+            
+            // 既存のセルをクリア（ヘッダーは保持）
+            const cells = bingoCard.querySelectorAll('.bingo-cell');
+            cells.forEach(cell => cell.remove());
+            
+            // カードデータからセルを生成
+            for (let row = 0; row < 5; row++) {
+                for (let col = 0; col < 5; col++) {
+                    const cell = document.createElement('div');
+                    cell.className = 'bingo-cell';
+                    
+                    const number = cardData[row][col];
+                    const cellId = `${row}-${col}`;
+                    
+                    if (number === 0) {
+                        // FREE セル
+                        cell.textContent = 'FREE';
+                        cell.classList.add('free', 'marked'); // 最初からマーク済み
+                        cell.dataset.free = 'true';
+                    } else {
+                        cell.textContent = number;
+                        cell.dataset.number = number;
+                        // クリック機能を削除
+                    }
+                    
+                    cell.dataset.row = row;
+                    cell.dataset.col = col;
+                    cell.id = cellId;
+                    
+                    bingoCard.appendChild(cell);
+                }
+            }
+            
+            updateCardDisplay();
+        }
+
+        // カード表示を更新（自動マーク機能付き）
+        function updateCardDisplay() {
+            const cells = document.querySelectorAll('.bingo-cell');
+            const cardData = currentCard.card_data;
+            
+            cells.forEach(cell => {
+                const number = parseInt(cell.dataset.number);
+                const row = parseInt(cell.dataset.row);
+                const col = parseInt(cell.dataset.col);
+                const cellId = `${row}-${col}`;
+                
+                if (cell.dataset.free === 'true') {
+                    // FREEセルは常にマーク済み
+                    cell.classList.add('marked');
+                    return;
+                }
+                
+                if (calledNumbers.includes(number)) {
+                    // 呼ばれた番号は自動的にマーク
+                    cell.classList.add('called', 'marked');
+                } else {
+                    // 呼ばれていない番号はマークを解除
+                    cell.classList.remove('called', 'marked');
+                }
+            });
+            
+            console.log('=== カード表示更新完了 ===');
+            console.log('自動マーク済みセル数:', document.querySelectorAll('.bingo-cell.marked').length);
+        }
+
+        // 呼ばれた番号を更新
+        function updateCalledNumbers() {
+            // 現在の番号を表示
+            const currentNumberDiv = document.getElementById('currentNumber');
+            if (calledNumbers.length > 0) {
+                const latestNumber = calledNumbers[calledNumbers.length - 1];
+                currentNumberDiv.textContent = latestNumber;
+                currentNumberDiv.style.color = '#27ae60';
+            } else {
+                currentNumberDiv.textContent = '待機中';
+                currentNumberDiv.style.color = '#95a5a5';
+            }
+            
+            // カード表示を更新（自動マーク)
+            updateCardDisplay();
+            
+            // 接続ステータスを更新
+            updateConnectionStatus('online');
+            
+            // 自動ビンゴチェック
+            autoCheckBingo();
+            
+            // デバッグ情報を表示
+            console.log(`=== 番号更新完了 ===`);
+            console.log(`呼ばれた番号数: ${calledNumbers.length}`);
+            console.log(`呼ばれた番号: [${calledNumbers.join(', ')}]`);
+            
+            // UIにも詳細情報を表示
+            const gameStatus = document.getElementById('gameStatus');
+            if (calledNumbers.length > 0) {
+                gameStatus.innerHTML = `
+                    自動的にマークしています。ビンゴが成立すると自動で通知されます。<br>
+                    <small>現在 ${calledNumbers.length} 個の番号が呼ばれています</small>
+                `;
+            }
+        }
+
+        // 自動ビンゴチェック機能
+        async function autoCheckBingo() {
+            if (!currentCard || calledNumbers.length === 0) {
+                return;
+            }
+            
+            // 前回と同じ番号リストなら再チェックしない
+            const currentNumbersString = calledNumbers.join(',');
+            if (lastBingoCheck === currentNumbersString) {
+                return;
+            }
+            
+            console.log('=== 自動ビンゴチェック開始 ===');
+            console.log('呼ばれた番号:', calledNumbers);
+            
+            try {
+                // 現在マークされているセルを取得
+                const markedElements = document.querySelectorAll('.bingo-cell.marked');
+                const markedCells = Array.from(markedElements).map(el => el.id).filter(id => id);
+                
+                console.log('自動マーク済みセル:', markedCells);
+                
+                const response = await fetch('../api/check-bingo.php', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        password: currentCard.password,
+                        marked_cells: markedCells
+                    })
+                });
+                
+                const data = await response.json();
+                console.log('自動ビンゴチェック結果:', data);
+                
+                if (data.success) {
+                    if (data.bingo_result.has_bingo) {
+                        // ビンゴ成立！ポップアップを表示
+                        showBingoPopup(data.bingo_result.lines);
+                        
+                        // ステータス表示
+                        showStatus('🎉 ビンゴが成立しました！ 🎉', 'success');
+                        
+                        // ビンゴラインをハイライト
+                        highlightBingoLines(data.bingo_result.lines);
+                        
+                        // チェック済みとしてマーク
+                        lastBingoCheck = currentNumbersString;
+                    } else {
+                        console.log('ビンゴ未成立 - 有効マーク数:', data.bingo_result.valid_marked_count);
+                    }
+                } else {
+                    console.error('自動ビンゴチェックエラー:', data.error);
+                }
+                
+            } catch (error) {
+                console.error('自動ビンゴチェック失敗:', error);
+            }
+        }
+
+        // 呼ばれた番号を取得する関数（エラーハンドリング強化版）
+        async function loadCalledNumbers() {
+            updateConnectionStatus('connecting');
+            
+            try {
+                console.log('=== 呼ばれた番号取得開始 ===');
+                console.log('現在時刻:', new Date().toLocaleString('ja-JP'));
+                
+                // 複数のAPIパスを試行
+                const apiPaths = [
+                    '../api/get-data.php',
+                    'api/get-data.php',
+                    './api/get-data.php'
+                ];
+                
+                let lastError = null;
+                let response = null;
+                let successPath = null;
+                
+                for (const apiPath of apiPaths) {
+                    try {
+                        console.log(`APIパス試行: ${apiPath}`);
+                        const fullUrl = new URL(apiPath, window.location.href).href;
+                        console.log(`完全URL: ${fullUrl}`);
+                        
+                        response = await fetch(apiPath, {
+                            method: 'GET',
+                            headers: {
+                                'Content-Type': 'application/json',
+                            },
+                            cache: 'no-cache'
+                        });
+                        
+                        if (response.ok) {
+                            console.log(`✅ 成功: ${apiPath} (status: ${response.status})`);
+                            successPath = apiPath;
+                            break;
+                        } else {
+                            console.log(`❌ 失敗: ${apiPath} (status: ${response.status})`);
+                            lastError = new Error(`HTTP ${response.status} - ${response.statusText}`);
+                            response = null;
+                        }
+                    } catch (error) {
+                        console.log(`❌ エラー: ${apiPath} - ${error.message}`);
+                        lastError = error;
+                        response = null;
+                    }
+                }
+                
+                if (!response || !response.ok) {
+                    throw lastError || new Error('すべてのAPIパスで接続に失敗しました');
+                }
+                
+                const data = await response.json();
+                console.log('✅ APIレスポンス成功:', data);
+                console.log('使用されたパス:', successPath);
+                
+                if (data.success) {
+                    // 番号データを取得
+                    const newNumbers = data.numbers || data.calledNumbers || [];
+                    console.log('取得した番号:', newNumbers);
+                    console.log('番号の型:', typeof newNumbers, Array.isArray(newNumbers));
+                    console.log('番号数:', newNumbers.length);
+                    
+                    // 番号を更新
+                    const previousCount = calledNumbers.length;
+                    calledNumbers = newNumbers.map(n => parseInt(n)); // 数値型に統一
+                    
+                    console.log('更新前の番号数:', previousCount);
+                    console.log('更新後の番号数:', calledNumbers.length);
+                    console.log('更新後の番号:', calledNumbers);
+                    
+                    // カード表示を更新
+                    updateCalledNumbers();
+                    
+                    // ステータス表示
+                    const statusMessage = `✅ 最新データを取得しました (${newNumbers.length}個の番号) - ${new Date().toLocaleTimeString('ja-JP')}`;
+                    showStatus(statusMessage, 'success');
+                    
+                    // 新しい番号があった場合の通知
+                    if (calledNumbers.length > previousCount) {
+                        const newCount = calledNumbers.length - previousCount;
+                        console.log(`🆕 ${newCount}個の新しい番号が追加されました`);
+                    }
+                    
+                } else {
+                    console.warn('⚠️ APIはエラーを返しました:', data.error || 'Unknown error');
+                    updateConnectionStatus('error');
+                    showStatus(`⚠️ データ取得エラー: ${data.error || '不明なエラー'}`, 'warning');
+                }
+                
+            } catch (error) {
+                console.error('=== 呼ばれた番号取得エラー ===');
+                console.error('Error details:', error);
+                console.error('Error message:', error.message);
+                console.error('Error stack:', error.stack);
+                
+                updateConnectionStatus('error');
+                
+                // より詳細なエラー情報をユーザーに表示
+                let errorMessage = 'サーバーとの接続に失敗しました。';
+                if (error.message.includes('Failed to fetch')) {
+                    errorMessage += ' ネットワークエラーまたはサーバーが応答していません。';
+                } else if (error.message.includes('HTTP 404')) {
+                    errorMessage += ' get-data.php ファイルが見つかりません。';
+                } else if (error.message.includes('HTTP 500')) {
+                    errorMessage += ' サーバー内部エラーが発生しました。';
+                }
+                errorMessage += ` (${error.message})`;
+                
+                showStatus(`❌ ${errorMessage}`, 'error');
+                
+                // デバッグ情報を表示
+                console.log('=== デバッグ情報 ===');
+                console.log('現在のURL:', window.location.href);
+                console.log('ベースURL:', window.location.origin);
+                console.log('パス:', window.location.pathname);
+                console.log('プロトコル:', window.location.protocol);
+            }
+        }
+
+        // ゲーム初期化
+        function initializeGame() {
+            console.log('=== ゲーム初期化開始 ===');
+            console.log('カード情報:', currentCard);
+            
+            // 番号読み込み
+            loadCalledNumbers();
+            
+            // 定期更新（30秒ごと）
+            if (bingoCheckInterval) {
+                clearInterval(bingoCheckInterval);
+            }
+            bingoCheckInterval = setInterval(() => {
+                console.log('=== 定期更新実行 ===');
+                loadCalledNumbers();
+            }, 30000);
+            
+            console.log('定期更新タイマー設定完了 (30秒間隔)');
+        }
+
+        // ページがフォーカスされたときも更新
+        window.addEventListener('focus', () => {
+            if (currentCard) {
+                console.log('ページフォーカス - 番号を更新');
+                loadCalledNumbers();
+            }
+        });
+        // ビンゴポップアップを表示
+        function showBingoPopup(lines) {
+            const popup = document.getElementById('bingoPopup');
+            const header = document.getElementById('bingoPopupHeader');
+            const message = document.getElementById('bingoPopupMessage');
+            const linesList = document.getElementById('bingoLinesList');
+            
+            // ヘッダーメッセージの設定
+            if (lines.length === 1) {
+                header.textContent = '🎉 ビンゴ！ 🎉';
+                message.textContent = 'おめでとうございます！ビンゴが成立しました！';
+            } else if (lines.length >= 2) {
+                header.textContent = '🎆 ダブルビンゴ！ 🎆';
+                message.textContent = `素晴らしい！${lines.length}つのラインでビンゴです！`;
+            }
+            
+            // ビンゴラインの詳細を表示
+            linesList.innerHTML = '';
+            lines.forEach(line => {
+                const lineItem = document.createElement('div');
+                lineItem.className = 'bingo-line-item';
+                lineItem.textContent = line.description;
+                linesList.appendChild(lineItem);
+            });
+            
+            // ポップアップを表示
+            popup.classList.add('show');
+            
+            // 効果音を再生（オプション）
+            playBingoSound();
+            
+            console.log('ビンゴポップアップを表示しました');
+        }
+        
+        // ビンゴポップアップを閉じる
+        function closeBingoPopup() {
+            const popup = document.getElementById('bingoPopup');
+            popup.classList.remove('show');
+            console.log('ビンゴポップアップを閉じました');
+        }
+        
+        // 効果音を再生（オプション）
+        function playBingoSound() {
+            try {
+                // Web Audio APIを使用してビープ音を生成
+                const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                
+                // 複数の音を重ねて祝福音を作成
+                const frequencies = [523.25, 659.25, 783.99]; // C, E, G の和音
+                
+                frequencies.forEach((freq, index) => {
+                    const oscillator = audioContext.createOscillator();
+                    const gainNode = audioContext.createGain();
+                    
+                    oscillator.connect(gainNode);
+                    gainNode.connect(audioContext.destination);
+                    
+                    oscillator.frequency.setValueAtTime(freq, audioContext.currentTime);
+                    oscillator.type = 'sine';
+                    
+                    gainNode.gain.setValueAtTime(0.1, audioContext.currentTime);
+                    gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 1);
+                    
+                    oscillator.start(audioContext.currentTime + index * 0.1);
+                    oscillator.stop(audioContext.currentTime + 1 + index * 0.1);
+                });
+                
+                console.log('ビンゴ効果音を再生しました');
+            } catch (error) {
+                console.log('効果音の再生に失敗:', error.message);
+            }
+        }
+
+        // ビンゴラインをハイライト
+        function highlightBingoLines(lines) {
+            lines.forEach(line => {
+                if (line.cells) {
+                    line.cells.forEach(cellId => {
+                        const cell = document.getElementById(cellId);
+                        if (cell) {
+                            cell.classList.add('bingo-line');
+                            cell.style.background = '#f39c12';
+                            cell.style.animation = 'pulse 1s infinite';
+                        }
+                    });
+                }
+            });
+        }
+
+        // 手動ビンゴチェック（デバッグ用）
+        async function checkBingo() {
+            if (!currentCard) {
+                showStatus('カード情報が見つかりません。', 'error');
+                return;
+            }
+            
+            await autoCheckBingo();
+            showStatus('手動チェック完了', 'info');
+        }
+        
+        // ポップアップの背景クリックで閉じる
+        document.addEventListener('DOMContentLoaded', function() {
+            const popup = document.getElementById('bingoPopup');
+            popup.addEventListener('click', function(e) {
+                if (e.target === popup) {
+                    closeBingoPopup();
+                }
+            });
+            
+            // 既存のイベントリスナー...
+            document.getElementById('password').addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') {
+                    login();
+                }
+            });
+            
+            document.getElementById('participantName').addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') {
+                    login();
+                }
+            });
+        });
+
+        // Escapeキーでポップアップを閉じる
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') {
+                closeBingoPopup();
+            }
+        });
+    </script>
+</body>
+</html>

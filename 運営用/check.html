@@ -1,0 +1,536 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ビンゴチェック - 運営者用</title>
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: linear-gradient(135deg, #8e44ad 0%, #3498db 100%);
+            min-height: 100vh;
+        }
+
+        .container {
+            background: white;
+            border-radius: 15px;
+            padding: 30px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+            max-width: 1000px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            color: #2c3e50;
+            text-align: center;
+            margin-bottom: 30px;
+            font-size: 2.5em;
+        }
+
+        .nav-links {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .nav-links a {
+            background: #95a5a6;
+            color: white;
+            padding: 10px 20px;
+            border-radius: 8px;
+            text-decoration: none;
+            margin: 0 10px;
+            font-weight: bold;
+            transition: background 0.3s;
+        }
+
+        .nav-links a:hover {
+            background: #7f8c8d;
+        }
+
+        .bingo-counter {
+            background: #ecf0f1;
+            padding: 25px;
+            border-radius: 10px;
+            margin-bottom: 30px;
+            text-align: center;
+        }
+
+        .current-count {
+            font-size: 3em;
+            font-weight: bold;
+            color: #e74c3c;
+            margin: 20px 0;
+        }
+
+        .counter-controls {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            margin: 20px 0;
+            flex-wrap: wrap;
+        }
+
+        .btn {
+            padding: 12px 25px;
+            font-size: 1.1em;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: all 0.3s;
+        }
+
+        .btn-success {
+            background: #27ae60;
+            color: white;
+        }
+
+        .btn-success:hover {
+            background: #229954;
+            transform: translateY(-2px);
+        }
+
+        .btn-warning {
+            background: #f39c12;
+            color: white;
+        }
+
+        .btn-warning:hover {
+            background: #e67e22;
+            transform: translateY(-2px);
+        }
+
+        .btn-danger {
+            background: #e74c3c;
+            color: white;
+        }
+
+        .btn-danger:hover {
+            background: #c0392b;
+            transform: translateY(-2px);
+        }
+
+        .btn-primary {
+            background: #3498db;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #2980b9;
+            transform: translateY(-2px);
+        }
+
+        .manual-input {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 10px;
+            margin: 20px 0;
+            flex-wrap: wrap;
+        }
+
+        .manual-input input {
+            padding: 10px;
+            font-size: 1.2em;
+            border: 2px solid #bdc3c7;
+            border-radius: 8px;
+            width: 100px;
+            text-align: center;
+        }
+
+        .notes-section {
+            margin: 20px 0;
+        }
+
+        .notes-section textarea {
+            width: 100%;
+            padding: 10px;
+            border: 2px solid #bdc3c7;
+            border-radius: 8px;
+            font-size: 1em;
+            resize: vertical;
+            min-height: 80px;
+            box-sizing: border-box;
+        }
+
+        .numbers-display {
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 20px;
+            margin-top: 30px;
+        }
+
+        .sort-controls {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+
+        .sort-btn {
+            background: #95a5a6;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 25px;
+            cursor: pointer;
+            font-size: 1em;
+            font-weight: bold;
+            transition: all 0.3s;
+            min-width: 120px;
+        }
+
+        .sort-btn.active {
+            background: #8e44ad;
+            transform: scale(1.05);
+            box-shadow: 0 4px 8px rgba(142, 68, 173, 0.3);
+        }
+
+        .sort-btn:hover {
+            background: #34495e;
+        }
+
+        .sort-btn.active:hover {
+            background: #7d3c98;
+        }
+
+        .numbers-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(60px, 1fr));
+            gap: 10px;
+            margin-top: 20px;
+        }
+
+        .number-item {
+            background: #27ae60;
+            color: white;
+            padding: 12px 8px;
+            border-radius: 8px;
+            font-weight: bold;
+            font-size: 1.2em;
+            text-align: center;
+        }
+
+        .number-item.latest {
+            background: #e74c3c;
+            transform: scale(1.1);
+            box-shadow: 0 4px 8px rgba(231, 76, 60, 0.4);
+        }
+
+        .status-info {
+            background: #d5dbdb;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 20px 0;
+            font-size: 0.9em;
+            color: #2c3e50;
+        }
+
+        .message {
+            padding: 15px;
+            border-radius: 8px;
+            margin: 10px 0;
+            font-weight: bold;
+        }
+
+        .message.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .message.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                padding: 15px;
+                margin: 10px;
+            }
+            
+            .counter-controls {
+                flex-direction: column;
+                align-items: center;
+            }
+            
+            .manual-input {
+                flex-direction: column;
+            }
+            
+            .manual-input input {
+                width: 200px;
+            }
+            
+            .numbers-grid {
+                grid-template-columns: repeat(auto-fill, minmax(50px, 1fr));
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>✅ ビンゴチェック - 運営者用</h1>
+        
+        <div class="nav-links">
+            <a href="index.html">📢 ビンゴ進行</a>
+            <a href="check.html">✅ ビンゴチェック</a>
+        </div>
+        
+        <div class="bingo-counter">
+            <h2>🎯 ビンゴ達成者数</h2>
+            <div class="current-count" id="bingoCount">0</div>
+            <div>人</div>
+            
+            <div class="counter-controls">
+                <button class="btn btn-success" onclick="incrementBingo(1)">+1人</button>
+                <button class="btn btn-success" onclick="incrementBingo(5)">+5人</button>
+                <button class="btn btn-warning" onclick="incrementBingo(-1)">-1人</button>
+                <button class="btn btn-danger" onclick="resetBingo()">リセット</button>
+            </div>
+            
+            
+            <div class="notes-section">
+                <label for="notes">メモ:</label>
+                <textarea id="notes" placeholder="特記事項があれば記入してください..."></textarea>
+                <button class="btn btn-primary" onclick="saveNotes()">メモ保存</button>
+            </div>
+        </div>
+        
+        <div id="messageArea"></div>
+        
+        <div class="status-info" id="statusInfo">
+            <div>最終更新: <span id="lastUpdated">未更新</span></div>
+            <div>出た番号数: <span id="numbersCount">0</span>個</div>
+        </div>
+        
+        <div class="numbers-display">
+            <h3>📋 これまでに出た番号</h3>
+            
+            <div class="sort-controls">
+                <button class="sort-btn active" id="sortByOrder" onclick="setSortMode('order')">
+                    📅 出た順
+                </button>
+                <button class="sort-btn" id="sortByNumber" onclick="setSortMode('number')">
+                    🔢 数字順
+                </button>
+            </div>
+            
+            <div class="numbers-grid" id="numbersGrid">
+                <!-- 番号がここに表示されます -->
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let calledNumbers = [];
+        let sortMode = 'order';
+        let currentBingoCount = 0;
+        const API_BASE = '../api/bingo-check.php';
+
+        // APIリクエスト関数
+        async function apiRequest(action, data = {}) {
+            try {
+                const response = await fetch(API_BASE, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        action: action,
+                        ...data
+                    })
+                });
+
+                const result = await response.json();
+                
+                if (!result.success) {
+                    throw new Error(result.error || 'API request failed');
+                }
+                
+                return result;
+            } catch (error) {
+                console.error('API Error:', error);
+                showMessage('エラー: ' + error.message, 'error');
+                throw error;
+            }
+        }
+
+        // データを読み込み
+        async function loadData() {
+            try {
+                const response = await fetch(API_BASE);
+                const result = await response.json();
+                
+                if (result.success) {
+                    currentBingoCount = result.bingoCount || 0;
+                    calledNumbers = result.calledNumbers || [];
+                    
+                    updateDisplay();
+                    
+                    // ステータス情報更新
+                    document.getElementById('lastUpdated').textContent = 
+                        result.lastUpdated ? new Date(result.lastUpdated).toLocaleString('ja-JP') : '未更新';
+                    document.getElementById('numbersCount').textContent = calledNumbers.length;
+                    document.getElementById('notes').value = result.notes || '';
+                    
+                    console.log('データ読み込み成功:', result);
+                } else {
+                    throw new Error(result.error || 'Failed to load data');
+                }
+            } catch (error) {
+                console.error('Load Error:', error);
+                showMessage('データの読み込みに失敗しました: ' + error.message, 'error');
+            }
+        }
+
+        // ビンゴ人数を増減
+        async function incrementBingo(increment) {
+            try {
+                const result = await apiRequest('increment', { increment: increment });
+                currentBingoCount = result.newCount;
+                updateDisplay();
+                showMessage(result.message, 'success');
+            } catch (error) {
+                // エラーは apiRequest 内で既に表示済み
+            }
+        }
+
+        // ビンゴ人数を手動設定
+        async function updateManualCount() {
+            const input = document.getElementById('manualCount');
+            const count = parseInt(input.value);
+            const notes = document.getElementById('notes').value;
+            
+            if (isNaN(count) || count < 0) {
+                showMessage('正しい数値を入力してください', 'error');
+                return;
+            }
+            
+            try {
+                const result = await apiRequest('update_count', { count: count, notes: notes });
+                currentBingoCount = count;
+                updateDisplay();
+                showMessage(result.message, 'success');
+                input.value = '';
+            } catch (error) {
+                // エラーは apiRequest 内で既に表示済み
+            }
+        }
+
+        // メモを保存
+        async function saveNotes() {
+            const notes = document.getElementById('notes').value;
+            
+            try {
+                const result = await apiRequest('update_count', { 
+                    count: currentBingoCount, 
+                    notes: notes 
+                });
+                showMessage('メモを保存しました', 'success');
+            } catch (error) {
+                // エラーは apiRequest 内で既に表示済み
+            }
+        }
+
+        // ビンゴ記録をリセット
+        async function resetBingo() {
+            if (confirm('本当にビンゴ記録をリセットしますか？')) {
+                try {
+                    const result = await apiRequest('reset');
+                    currentBingoCount = 0;
+                    updateDisplay();
+                    document.getElementById('notes').value = '';
+                    showMessage(result.message, 'success');
+                } catch (error) {
+                    // エラーは apiRequest 内で既に表示済み
+                }
+            }
+        }
+
+        // ソートモードを設定
+        function setSortMode(mode) {
+            sortMode = mode;
+            
+            // ボタンのアクティブ状態を更新
+            document.getElementById('sortByOrder').classList.remove('active');
+            document.getElementById('sortByNumber').classList.remove('active');
+            document.getElementById(`sortBy${mode.charAt(0).toUpperCase() + mode.slice(1)}`).classList.add('active');
+            
+            // 表示を更新
+            displayNumbers();
+        }
+
+        // 表示を更新
+        function updateDisplay() {
+            // ビンゴ人数表示
+            document.getElementById('bingoCount').textContent = currentBingoCount;
+            document.getElementById('manualCount').placeholder = currentBingoCount;
+            
+            // 番号表示
+            displayNumbers();
+        }
+
+        // 番号を表示
+        function displayNumbers() {
+            const numbersGridEl = document.getElementById('numbersGrid');
+            numbersGridEl.innerHTML = '';
+            
+            let sortedNumbers;
+            if (sortMode === 'order') {
+                // 出た順（新しい順）
+                sortedNumbers = [...calledNumbers].reverse();
+            } else {
+                // 数字順（小さい順）
+                sortedNumbers = [...calledNumbers].sort((a, b) => a - b);
+            }
+            
+            sortedNumbers.forEach((number, index) => {
+                const numberDiv = document.createElement('div');
+                numberDiv.className = 'number-item';
+                numberDiv.textContent = number;
+                
+                // 最新の番号は特別なスタイル（出た順の場合のみ）
+                if (sortMode === 'order' && index === 0 && calledNumbers.length > 0) {
+                    numberDiv.classList.add('latest');
+                } else if (sortMode === 'number' && number === calledNumbers[calledNumbers.length - 1]) {
+                    // 数字順の場合、最新の番号に枠線を追加
+                    numberDiv.style.border = '3px solid #e74c3c';
+                    numberDiv.style.boxShadow = '0 2px 4px rgba(231, 76, 60, 0.3)';
+                }
+                
+                numbersGridEl.appendChild(numberDiv);
+            });
+        }
+
+        // メッセージ表示
+        function showMessage(text, type) {
+            const messageArea = document.getElementById('messageArea');
+            const message = document.createElement('div');
+            message.className = `message ${type}`;
+            message.textContent = text;
+            
+            messageArea.innerHTML = '';
+            messageArea.appendChild(message);
+            
+            setTimeout(() => {
+                messageArea.innerHTML = '';
+            }, 3000);
+        }
+
+        // 定期的な自動更新（30秒ごと）
+        setInterval(() => {
+            console.log('自動更新を実行します...');
+            loadData();
+        }, 30000);
+
+        // 初期読み込み
+        loadData();
+    </script>
+</body>
+</html>

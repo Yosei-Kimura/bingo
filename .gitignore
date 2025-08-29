@@ -1,0 +1,26 @@
+# セッションファイル
+*.tmp
+*.temp
+
+# システムファイル
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# 一時ファイル
+*~
+*.swp
+*.bak
+
+# PHPセッション
+sessions/
+
+# データベースファイル（もしある場合）
+*.db
+*.sqlite
+
+# ログファイル
+*.log
+
+# 設定ファイル（機密情報が含まれる場合）
+config/local_config.php
