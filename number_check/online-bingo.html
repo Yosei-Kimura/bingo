@@ -621,721 +621,564 @@
     </div>
 
     <script>
-        let currentCard = null;
-        let calledNumbers = [];
-        let bingoCheckInterval = null;
-        let lastBingoCheck = null; // 最後にビンゴチェックした番号リスト
+let currentCard = null;
+let calledNumbers = [];
+let bingoCheckInterval = null;
+let lastBingoCheck = null;
 
-        // より安全なログイン処理
-        async function login() {
-            const password = document.getElementById('password').value.trim();
-            const participantName = document.getElementById('participantName').value.trim();
-            const loginBtn = document.getElementById('loginBtn');
-            
-            if (!password) {
-                showStatus('パスワードを入力してください。', 'error');
-                return;
-            }
-            
-            // パスワードフィールドをクリア（メモリ上の痕跡を削除）
-            document.getElementById('password').value = '';
-            
-            loginBtn.disabled = true;
-            loginBtn.textContent = '取得中...';
-            
-            try {
-                // セッションベースの認証を使用
-                const response = await fetch('../api/authenticate.php', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-Requested-With': 'XMLHttpRequest' // CSRF対策
-                    },
-                    body: JSON.stringify({
-                        password: password,
-                        participant_name: participantName,
-                        action: 'login'
-                    }),
-                    credentials: 'same-origin' // Cookieを含める
-                });
-                
-                const data = await response.json();
-                
-                if (data.success && data.card) {
-                    currentCard = data.card;
-                    
-                    // パスワードは保存せず、セッションIDのみ保存
-                    saveSession(data.session_id, data.card);
-                    
-                    showBingoCard();
-                    initializeGame();
-                    showStatus('ビンゴカードを取得しました！', 'success');
-                } else {
-                    showStatus(data.error || 'カードの取得に失敗しました。', 'error');
-                }
-                
-            } catch (error) {
-                console.error('ログインエラー:', error);
-                showStatus('サーバーとの接続に失敗しました。', 'error');
-            } finally {
-                loginBtn.disabled = false;
-                loginBtn.textContent = 'ビンゴカードを取得';
-            }
+// ステータス表示関数
+function showStatus(message, type = 'info') {
+    const statusElement = document.getElementById('gameStatus');
+    if (statusElement) {
+        statusElement.textContent = message;
+        statusElement.className = `status ${type}`;
+    } else {
+        // フォールバック: ログイン画面のステータス要素を使用
+        const loginStatus = document.querySelector('.login-section .status');
+        if (loginStatus) {
+            loginStatus.innerHTML = message;
+            loginStatus.className = `status ${type}`;
+        } else {
+            console.log(`[${type.toUpperCase()}] ${message}`);
         }
+    }
+}
 
-        // セッション情報の保存（パスワードは保存しない）
-        function saveSession(sessionId, cardData) {
-            try {
-                // パスワードではなくセッションIDを保存
-                localStorage.setItem('bingoSessionId', sessionId);
-                localStorage.setItem('bingoCardData', JSON.stringify(cardData));
-                localStorage.setItem('bingoLoginTime', Date.now().toString());
-                console.log('セッション情報を保存しました');
-            } catch (error) {
-                console.error('セッション情報の保存に失敗:', error);
-            }
+// 接続ステータス更新関数
+function updateConnectionStatus(status) {
+    const statusElement = document.getElementById('connectionStatus');
+    if (statusElement) {
+        statusElement.className = `connection-status ${status}`;
+        switch(status) {
+            case 'online':
+                statusElement.textContent = '接続中';
+                break;
+            case 'offline':
+                statusElement.textContent = '切断';
+                break;
+            case 'connecting':
+                statusElement.textContent = '接続中...';
+                break;
+            case 'error':
+                statusElement.textContent = 'エラー';
+                break;
         }
+    }
+}
 
-        // ビンゴカード画面を表示
-        function showBingoCard() {
-            document.getElementById('loginSection').style.display = 'none';
-            document.getElementById('bingoSection').style.display = 'block';
-            
-            // 参加者情報を表示（ログアウトボタンを追加）
-            const participantInfo = document.getElementById('participantInfo');
-            participantInfo.innerHTML = `
-                <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap;">
-                    <div>
-                        <strong>カード作成日時:</strong> ${new Date(currentCard.created_at).toLocaleString('ja-JP')}
-                    </div>
-                    <button onclick="logout()" style="background: #e74c3c; color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer; font-size: 0.9em;">
-                        ログアウト
-                    </button>
-                </div>
-            `;
-            
-            // ビンゴカードを描画
-            renderBingoCard();
-        }
+// ログイン情報を保存する関数（追加）
+function saveLoginData(password, participantName, cardData) {
+    try {
+        const loginData = {
+            password: password,
+            participant_name: participantName,
+            card_data: cardData,
+            login_time: Date.now()
+        };
+        localStorage.setItem('bingoLoginData', JSON.stringify(loginData));
+        console.log('ログイン情報を保存しました');
+    } catch (error) {
+        console.error('ログイン情報の保存に失敗:', error);
+    }
+}
 
-        // ビンゴカードを描画
-        function renderBingoCard() {
-            const bingoCard = document.getElementById('bingoCard');
-            const cardData = currentCard.card_data;
-            
-            // 既存のセルをクリア（ヘッダーは保持）
-            const cells = bingoCard.querySelectorAll('.bingo-cell');
-            cells.forEach(cell => cell.remove());
-            
-            // カードデータからセルを生成
-            for (let row = 0; row < 5; row++) {
-                for (let col = 0; col < 5; col++) {
-                    const cell = document.createElement('div');
-                    cell.className = 'bingo-cell';
-                    
-                    const number = cardData[row][col];
-                    const cellId = `${row}-${col}`;
-                    
-                    if (number === 0) {
-                        // FREE セル
-                        cell.textContent = 'FREE';
-                        cell.classList.add('free', 'marked'); // 最初からマーク済み
-                        cell.dataset.free = 'true';
-                    } else {
-                        cell.textContent = number;
-                        cell.dataset.number = number;
-                        // クリック機能を削除
-                    }
-                    
-                    cell.dataset.row = row;
-                    cell.dataset.col = col;
-                    cell.id = cellId;
-                    
-                    bingoCard.appendChild(cell);
-                }
-            }
-            
-            updateCardDisplay();
-        }
+// ゲーム初期化関数（追加）
+function initializeGame() {
+    // 呼ばれた番号を取得
+    loadCalledNumbers();
+    
+    // 定期的に番号を更新（10秒間隔）
+    if (bingoCheckInterval) {
+        clearInterval(bingoCheckInterval);
+    }
+    bingoCheckInterval = setInterval(loadCalledNumbers, 10000);
+    
+    console.log('ゲームを初期化しました');
+}
 
-        // カード表示を更新（自動マーク機能付き）
-        function updateCardDisplay() {
-            const cells = document.querySelectorAll('.bingo-cell');
-            const cardData = currentCard.card_data;
-            
-            cells.forEach(cell => {
-                const number = parseInt(cell.dataset.number);
-                const row = parseInt(cell.dataset.row);
-                const col = parseInt(cell.dataset.col);
-                const cellId = `${row}-${col}`;
-                
-                if (cell.dataset.free === 'true') {
-                    // FREEセルは常にマーク済み
-                    cell.classList.add('marked');
-                    return;
-                }
-                
-                if (calledNumbers.includes(number)) {
-                    // 呼ばれた番号は自動的にマーク
-                    cell.classList.add('called', 'marked');
-                } else {
-                    // 呼ばれていない番号はマークを解除
-                    cell.classList.remove('called', 'marked');
-                }
-            });
-            
-            console.log('=== カード表示更新完了 ===');
-            console.log('自動マーク済みセル数:', document.querySelectorAll('.bingo-cell.marked').length);
-        }
-
-        // 呼ばれた番号を更新
-        function updateCalledNumbers() {
-            // 現在の番号を表示
-            const currentNumberDiv = document.getElementById('currentNumber');
-            if (calledNumbers.length > 0) {
-                const latestNumber = calledNumbers[calledNumbers.length - 1];
-                currentNumberDiv.textContent = latestNumber;
-                currentNumberDiv.style.color = '#27ae60';
-            } else {
-                currentNumberDiv.textContent = '待機中';
-                currentNumberDiv.style.color = '#95a5a5';
-            }
-            
-            // カード表示を更新（自動マーク)
-            updateCardDisplay();
-            
-            // 接続ステータスを更新
-            updateConnectionStatus('online');
-            
-            // 自動ビンゴチェック
-            autoCheckBingo();
-            
-            // デバッグ情報を表示
-            console.log(`=== 番号更新完了 ===`);
-            console.log(`呼ばれた番号数: ${calledNumbers.length}`);
-            console.log(`呼ばれた番号: [${calledNumbers.join(', ')}]`);
-            
-            // UIにも詳細情報を表示
-            const gameStatus = document.getElementById('gameStatus');
-            if (calledNumbers.length > 0) {
-                gameStatus.innerHTML = `
-                    自動的にマークしています。ビンゴが成立すると自動で通知されます。<br>
-                    <small>現在 ${calledNumbers.length} 個の番号が呼ばれています</small>
-                `;
-            }
-        }
-
-        // 自動ビンゴチェック機能
-        async function autoCheckBingo() {
-            if (!currentCard || calledNumbers.length === 0) {
-                return;
-            }
-            
-            try {
-                const sessionId = localStorage.getItem('bingoSessionId');
-                const markedElements = document.querySelectorAll('.bingo-cell.marked');
-                const markedCells = Array.from(markedElements).map(el => el.id).filter(id => id);
-                
-                const response = await fetch('../api/check-bingo.php', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-Requested-With': 'XMLHttpRequest',
-                        'Authorization': `Bearer ${sessionId}`
-                    },
-                    body: JSON.stringify({
-                        action: 'check_bingo',
-                        session_id: sessionId,
-                        marked_cells: markedCells
-                    }),
-                    credentials: 'same-origin'
-                });
-                
-                const data = await response.json();
-                console.log('自動ビンゴチェック結果:', data);
-                
-                if (data.success) {
-                    if (data.bingo_result.has_bingo) {
-                        // ビンゴ成立！ポップアップを表示
-                        showBingoPopup(data.bingo_result.lines);
-                        
-                        // ステータス表示
-                        showStatus('🎉 ビンゴが成立しました！ 🎉', 'success');
-                        
-                        // ビンゴラインをハイライト
-                        highlightBingoLines(data.bingo_result.lines);
-                        
-                        // チェック済みとしてマーク
-                        lastBingoCheck = currentNumbersString;
-                    } else {
-                        console.log('ビンゴ未成立 - 有効マーク数:', data.bingo_result.valid_marked_count);
-                    }
-                } else {
-                    console.error('自動ビンゴチェックエラー:', data.error);
-                }
-                
-            } catch (error) {
-                console.error('自動ビンゴチェック失敗:', error);
-            }
-        }
-
-        // セッションベースの番号取得
-        async function loadCalledNumbers() {
-            updateConnectionStatus('connecting');
-            
-            try {
-                const sessionId = localStorage.getItem('bingoSessionId');
-                
-                const response = await fetch('../api/get-data.php', {
-                    method: 'POST', // GETからPOSTに変更
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-Requested-With': 'XMLHttpRequest',
-                        'Authorization': `Bearer ${sessionId}` // セッションIDをヘッダーで送信
-                    },
-                    body: JSON.stringify({
-                        action: 'get_numbers',
-                        session_id: sessionId
-                    }),
-                    credentials: 'same-origin',
-                    cache: 'no-cache'
-                });
-                
-                const data = await response.json();
-                console.log('✅ APIレスポンス成功:', data);
-                
-                if (data.success) {
-                    // 番号データを取得
-                    const newNumbers = data.numbers || data.calledNumbers || [];
-                    console.log('取得した番号:', newNumbers);
-                    console.log('番号の型:', typeof newNumbers, Array.isArray(newNumbers));
-                    console.log('番号数:', newNumbers.length);
-                    
-                    // 番号を更新
-                    const previousCount = calledNumbers.length;
-                    calledNumbers = newNumbers.map(n => parseInt(n)); // 数値型に統一
-                    
-                    console.log('更新前の番号数:', previousCount);
-                    console.log('更新後の番号数:', calledNumbers.length);
-                    console.log('更新後の番号:', calledNumbers);
-                    
-                    // カード表示を更新
-                    updateCalledNumbers();
-                    
-                    // ステータス表示
-                    const statusMessage = `✅ 最新データを取得しました (${newNumbers.length}個の番号) - ${new Date().toLocaleTimeString('ja-JP')}`;
-                    showStatus(statusMessage, 'success');
-                    
-                    // 新しい番号があった場合の通知
-                    if (calledNumbers.length > previousCount) {
-                        const newCount = calledNumbers.length - previousCount;
-                        console.log(`🆕 ${newCount}個の新しい番号が追加されました`);
-                    }
-                    
-                } else {
-                    console.warn('⚠️ APIはエラーを返しました:', data.error || 'Unknown error');
-                    updateConnectionStatus('error');
-                    showStatus(`⚠️ データ取得エラー: ${data.error || '不明なエラー'}`, 'warning');
-                }
-                
-            } catch (error) {
-                console.error('=== 呼ばれた番号取得エラー ===');
-                console.error('Error details:', error);
-                console.error('Error message:', error.message);
-                console.error('Error stack:', error.stack);
-                
-                updateConnectionStatus('error');
-                
-                // より詳細なエラー情報をユーザーに表示
-                let errorMessage = 'サーバーとの接続に失敗しました。';
-                if (error.message.includes('Failed to fetch')) {
-                    errorMessage += ' ネットワークエラーまたはサーバーが応答していません。';
-                } else if (error.message.includes('HTTP 404')) {
-                    errorMessage += ' get-data.php ファイルが見つかりません。';
-                } else if (error.message.includes('HTTP 500')) {
-                    errorMessage += ' サーバー内部エラーが発生しました。';
-                }
-                errorMessage += ` (${error.message})`;
-                
-                showStatus(`❌ ${errorMessage}`, 'error');
-                
-                // デバッグ情報を表示
-                console.log('=== デバッグ情報 ===');
-                console.log('現在のURL:', window.location.href);
-                console.log('ベースURL:', window.location.origin);
-                console.log('パス:', window.location.pathname);
-                console.log('プロトコル:', window.location.protocol);
-            }
-        }
-
-        // セッション確認
-        function checkSavedLogin() {
-            const savedSessionId = localStorage.getItem('bingoSessionId');
-            const savedCard = localStorage.getItem('bingoCardData');
-            const savedLoginTime = localStorage.getItem('bingoLoginTime');
-            
-            if (savedSessionId && savedCard && savedLoginTime) {
-                const twentyFourHours = 24 * 60 * 60 * 1000;
-                const loginTime = parseInt(savedLoginTime);
-                
-                if (Date.now() - loginTime < twentyFourHours) {
-                    // セッション有効性を確認
-                    validateSession(savedSessionId, savedCard);
-                    return;
-                }
-            }
-            
-            clearSavedLogin();
-            showLoginForm();
-        }
-
-        // セッション有効性確認
-        async function validateSession(sessionId, savedCard) {
-            try {
-                const response = await fetch('../api/validate-session.php', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${sessionId}`
-                    },
-                    body: JSON.stringify({
-                        session_id: sessionId
-                    }),
-                    credentials: 'same-origin'
-                });
-                
-                const data = await response.json();
-                
-                if (data.success && data.valid) {
-                    currentCard = JSON.parse(savedCard);
-                    showBingoCard();
-                    initializeGame();
-                    showStatus('セッションを復元しました', 'success');
-                } else {
-                    clearSavedLogin();
-                    showLoginForm();
-                    showStatus('セッションが無効です。再ログインしてください。', 'warning');
-                }
-            } catch (error) {
-                console.error('セッション検証エラー:', error);
-                clearSavedLogin();
-                showLoginForm();
-            }
-        }
-
-        // セッション情報をクリア
-        function clearSavedLogin() {
-            localStorage.removeItem('bingoSessionId');
-            localStorage.removeItem('bingoCardData');
-            localStorage.removeItem('bingoLoginTime');
-            console.log('セッション情報をクリアしました');
-        }
-
-        // ログアウト時にセッションを無効化
-        async function logout() {
-            const sessionId = localStorage.getItem('bingoSessionId');
-            
-            if (sessionId) {
-                try {
-                    await fetch('../api/logout.php', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                            'Authorization': `Bearer ${sessionId}`
-                        },
-                        body: JSON.stringify({
-                            session_id: sessionId
-                        }),
-                        credentials: 'same-origin'
-                    });
-                } catch (error) {
-                    console.error('ログアウト処理エラー:', error);
-                }
-            }
-            
-            clearSavedLogin();
-            currentCard = null;
-            calledNumbers = [];
-            
-            if (bingoCheckInterval) {
-                clearInterval(bingoCheckInterval);
-                bingoCheckInterval = null;
-            }
-            
-            document.getElementById('bingoSection').style.display = 'none';
-            document.getElementById('loginSection').style.display = 'block';
-            
-            showStatus('ログアウトしました', 'info');
-        }
-
-        // ビンゴポップアップを表示
-        function showBingoPopup(lines) {
-            const popup = document.getElementById('bingoPopup');
-            const header = document.getElementById('bingoPopupHeader');
-            const message = document.getElementById('bingoPopupMessage');
-            const linesList = document.getElementById('bingoLinesList');
-            
-            // ヘッダーメッセージの設定
-            if (lines.length === 1) {
-                header.textContent = '🎉 ビンゴ！ 🎉';
-                message.textContent = 'おめでとうございます！ビンゴが成立しました！';
-            } else if (lines.length >= 2) {
-                header.textContent = '🎆 ダブルビンゴ！ 🎆';
-                message.textContent = `素晴らしい！${lines.length}つのラインでビンゴです！`;
-            }
-            
-            // ビンゴラインの詳細を表示
-            linesList.innerHTML = '';
-            lines.forEach(line => {
-                const lineItem = document.createElement('div');
-                lineItem.className = 'bingo-line-item';
-                lineItem.textContent = line.description;
-                linesList.appendChild(lineItem);
-            });
-            
-            // ポップアップを表示
-            popup.classList.add('show');
-            
-            // 効果音を再生（オプション）
-            playBingoSound();
-            
-            console.log('ビンゴポップアップを表示しました');
-        }
-        
-        // ビンゴポップアップを閉じる
-        function closeBingoPopup() {
-            const popup = document.getElementById('bingoPopup');
-            popup.classList.remove('show');
-            console.log('ビンゴポップアップを閉じました');
-        }
-        
-        // 効果音を再生（オプション）
-        function playBingoSound() {
-            try {
-                // Web Audio APIを使用してビープ音を生成
-                const audioContext = new (window.AudioContext || window.webkitAudioContext)();
-                
-                // 複数の音を重ねて祝福音を作成
-                const frequencies = [523.25, 659.25, 783.99]; // C, E, G の和音
-                
-                frequencies.forEach((freq, index) => {
-                    const oscillator = audioContext.createOscillator();
-                    const gainNode = audioContext.createGain();
-                    
-                    oscillator.connect(gainNode);
-                    gainNode.connect(audioContext.destination);
-                    
-                    oscillator.frequency.setValueAtTime(freq, audioContext.currentTime);
-                    oscillator.type = 'sine';
-                    
-                    gainNode.gain.setValueAtTime(0.1, audioContext.currentTime);
-                    gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 1);
-                    
-                    oscillator.start(audioContext.currentTime + index * 0.1);
-                    oscillator.stop(audioContext.currentTime + 1 + index * 0.1);
-                });
-                
-                console.log('ビンゴ効果音を再生しました');
-            } catch (error) {
-                console.log('効果音の再生に失敗:', error.message);
-            }
-        }
-
-        // ビンゴラインをハイライト
-        function highlightBingoLines(lines) {
-            lines.forEach(line => {
-                if (line.cells) {
-                    line.cells.forEach(cellId => {
-                        const cell = document.getElementById(cellId);
-                        if (cell) {
-                            cell.classList.add('bingo-line');
-                            cell.style.background = '#f39c12';
-                            cell.style.animation = 'pulse 1s infinite';
-                        }
-                    });
-                }
-            });
-        }
-
-        // 手動ビンゴチェック（デバッグ用）
-        async function checkBingo() {
-            if (!currentCard) {
-                showStatus('カード情報が見つかりません。', 'error');
-                return;
-            }
-            
-            await autoCheckBingo();
-            showStatus('手動チェック完了', 'info');
-        }
-        
-        // ポップアップの背景クリックで閉じる
-        document.addEventListener('DOMContentLoaded', function() {
-            const popup = document.getElementById('bingoPopup');
-            popup.addEventListener('click', function(e) {
-                if (e.target === popup) {
-                    closeBingoPopup();
-                }
-            });
-            
-            // 既存のイベントリスナー...
-            document.getElementById('password').addEventListener('keypress', function(e) {
-                if (e.key === 'Enter') {
-                    login();
-                }
-            });
-            
-            document.getElementById('participantName').addEventListener('keypress', function(e) {
-                if (e.key === 'Enter') {
-                    login();
-                }
-            });
+// 呼ばれた番号を取得する関数（追加）
+async function loadCalledNumbers() {
+    updateConnectionStatus('connecting');
+    
+    try {
+        const response = await fetch('../api/get-data.php', {
+            method: 'GET',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            cache: 'no-cache'
         });
+        
+        const responseText = await response.text();
+        
+        if (responseText.startsWith('<!DOCTYPE') || responseText.startsWith('<html')) {
+            throw new Error('get-data.php ファイルが見つかりません。');
+        }
+        
+        let data;
+        try {
+            data = JSON.parse(responseText);
+        } catch (parseError) {
+            console.error('JSON parse error:', parseError);
+            throw new Error('無効なJSONレスポンス');
+        }
+        
+        console.log('✅ APIレスポンス成功:', data);
+        
+        if (data.success) {
+            const newNumbers = data.numbers || data.calledNumbers || [];
+            console.log('取得した番号:', newNumbers);
+            
+            calledNumbers = newNumbers.map(n => parseInt(n));
+            
+            updateCalledNumbers();
+            
+            const statusMessage = `✅ 最新データを取得しました (${newNumbers.length}個の番号) - ${new Date().toLocaleTimeString('ja-JP')}`;
+            showStatus(statusMessage, 'success');
+            
+        } else {
+            console.warn('⚠️ APIエラー:', data.error || 'Unknown error');
+            updateConnectionStatus('error');
+            showStatus(`⚠️ データ取得エラー: ${data.error || '不明なエラー'}`, 'warning');
+        }
+        
+    } catch (error) {
+        console.error('番号取得エラー:', error);
+        updateConnectionStatus('error');
+        
+        let errorMessage = 'サーバーとの接続に失敗しました。';
+        if (error.message.includes('get-data.php')) {
+            errorMessage += ' get-data.php ファイルが存在することを確認してください。';
+        }
+        
+        showStatus(`❌ ${errorMessage}`, 'error');
+    }
+}
 
-        // Escapeキーでポップアップを閉じる
-        document.addEventListener('keydown', function(e) {
-            if (e.key === 'Escape') {
+// 自動ビンゴチェック関数（追加）
+async function autoCheckBingo() {
+    if (!currentCard || calledNumbers.length === 0) {
+        return;
+    }
+    
+    try {
+        const markedElements = document.querySelectorAll('.bingo-cell.marked');
+        const markedCells = Array.from(markedElements).map(el => el.id).filter(id => id);
+        
+        const response = await fetch('../api/check-bingo.php', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                password: currentCard.password,
+                marked_cells: markedCells
+            })
+        });
+        
+        const responseText = await response.text();
+        
+        if (responseText.startsWith('<!DOCTYPE') || responseText.startsWith('<html')) {
+            console.warn('check-bingo.php ファイルが見つかりません');
+            return;
+        }
+        
+        const data = JSON.parse(responseText);
+        console.log('自動ビンゴチェック結果:', data);
+        
+        if (data.success && data.bingo_result && data.bingo_result.has_bingo) {
+            showBingoPopup(data.bingo_result.lines);
+            showStatus('🎉 ビンゴが成立しました！ 🎉', 'success');
+            highlightBingoLines(data.bingo_result.lines);
+        }
+        
+    } catch (error) {
+        console.error('自動ビンゴチェック失敗:', error);
+    }
+}
+
+// 手動ビンゴチェック関数（追加）
+async function checkBingo() {
+    if (!currentCard) {
+        showStatus('カードが読み込まれていません', 'error');
+        return;
+    }
+    
+    const bingoBtn = document.querySelector('button[onclick="checkBingo()"]');
+    if (bingoBtn) {
+        bingoBtn.disabled = true;
+        bingoBtn.textContent = 'チェック中...';
+    }
+    
+    try {
+        // マークされたセルを取得
+        const markedElements = document.querySelectorAll('.bingo-cell.marked, .bingo-cell.called, .bingo-cell.free');
+        const markedCells = Array.from(markedElements).map(el => el.id).filter(id => id);
+        
+        const response = await fetch('../api/check-bingo.php', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                password: currentCard.password,
+                marked_cells: markedCells
+            })
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            if (data.bingo_result && data.bingo_result.has_bingo) {
+                showBingoPopup(data.bingo_result.lines);
+                highlightBingoLines(data.bingo_result.lines);
+                showStatus('🎉 ビンゴが成立しています！ 🎉', 'success');
+            } else {
+                showStatus('まだビンゴになっていません', 'info');
+            }
+        } else {
+            showStatus('ビンゴチェックに失敗しました: ' + (data.error || '不明なエラー'), 'error');
+        }
+        
+    } catch (error) {
+        console.error('ビンゴチェックエラー:', error);
+        showStatus('ビンゴチェック中にエラーが発生しました', 'error');
+    } finally {
+        if (bingoBtn) {
+            bingoBtn.disabled = false;
+            bingoBtn.textContent = '🎯 ビンゴチェック';
+        }
+    }
+}
+
+// ビンゴポップアップ表示関数（追加）
+function showBingoPopup(bingoLines) {
+    const popup = document.getElementById('bingoPopup');
+    const linesList = document.getElementById('bingoLinesList');
+    
+    // ビンゴラインを表示
+    let linesHtml = '';
+    bingoLines.forEach((line, index) => {
+        linesHtml += `<div class="bingo-line-item">${getLineTypeName(line.type)} (${line.positions.length}個)</div>`;
+    });
+    
+    if (linesList) {
+        linesList.innerHTML = linesHtml;
+    }
+    
+    // ポップアップを表示
+    if (popup) {
+        popup.classList.add('show');
+    }
+}
+
+// ビンゴポップアップを閉じる関数（追加）
+function closeBingoPopup() {
+    const popup = document.getElementById('bingoPopup');
+    if (popup) {
+        popup.classList.remove('show');
+    }
+}
+
+// ビンゴラインをハイライト表示（追加）
+function highlightBingoLines(bingoLines) {
+    // 既存のハイライトをクリア
+    document.querySelectorAll('.bingo-cell.bingo-line').forEach(cell => {
+        cell.classList.remove('bingo-line');
+    });
+    
+    // 新しいハイライトを追加
+    bingoLines.forEach(line => {
+        line.positions.forEach(pos => {
+            const cell = document.getElementById(pos);
+            if (cell) {
+                cell.classList.add('bingo-line');
+            }
+        });
+    });
+}
+
+// ライン種別名を取得（追加）
+function getLineTypeName(type) {
+    const typeNames = {
+        'horizontal': '横一列',
+        'vertical': '縦一列',
+        'diagonal': '斜め一列'
+    };
+    return typeNames[type] || type;
+}
+
+// 保存されたログイン状態をチェック（修正）
+function checkSavedLogin() {
+    const savedLoginData = localStorage.getItem('bingoLoginData');
+    
+    if (savedLoginData) {
+        try {
+            const loginData = JSON.parse(savedLoginData);
+            const twentyFourHours = 24 * 60 * 60 * 1000;
+            
+            if (Date.now() - loginData.login_time < twentyFourHours) {
+                currentCard = loginData.card_data;
+                showBingoCard();
+                initializeGame();
+                showStatus('前回のセッションを復元しました', 'success');
+                return;
+            }
+        } catch (error) {
+            console.error('保存されたログイン情報の復元に失敗:', error);
+        }
+    }
+    
+    clearSavedLogin();
+    showLoginForm();
+}
+
+// ログイン情報をクリア（修正）
+function clearSavedLogin() {
+    localStorage.removeItem('bingoLoginData');
+    console.log('ログイン情報をクリアしました');
+}
+
+// ログアウト関数（修正）
+function logout() {
+    clearSavedLogin();
+    currentCard = null;
+    calledNumbers = [];
+    
+    if (bingoCheckInterval) {
+        clearInterval(bingoCheckInterval);
+        bingoCheckInterval = null;
+    }
+    
+    document.getElementById('bingoSection').style.display = 'none';
+    document.getElementById('loginSection').style.display = 'block';
+    
+    showStatus('ログアウトしました', 'info');
+}
+
+// 既存のAPIを使用するログイン処理
+async function login() {
+    const password = document.getElementById('password').value.trim();
+    const participantName = document.getElementById('participantName').value.trim();
+    const loginBtn = document.getElementById('loginBtn');
+    
+    if (!password) {
+        showStatus('パスワードを入力してください。', 'error');
+        return;
+    }
+    
+    loginBtn.disabled = true;
+    loginBtn.textContent = '取得中...';
+    
+    try {
+        // card-manager.phpを使用
+        const response = await fetch('../api/card-manager.php', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                password: password,
+                participant_name: participantName
+            })
+        });
+        
+        const responseText = await response.text();
+        console.log('Raw response:', responseText);
+        
+        if (responseText.startsWith('<!DOCTYPE') || responseText.startsWith('<html')) {
+            throw new Error('APIファイルが見つかりません。../api/card-manager.php が存在することを確認してください。');
+        }
+        
+        let data;
+        try {
+            data = JSON.parse(responseText);
+        } catch (parseError) {
+            console.error('JSON parse error:', parseError);
+            console.error('Response text:', responseText);
+            throw new Error('サーバーから無効なレスポンスを受信しました。');
+        }
+        
+        if (data.success && data.card) {
+            currentCard = data.card;
+            
+            // ログイン情報を保存
+            saveLoginData(password, participantName, data.card);
+            
+            showBingoCard();
+            initializeGame();
+            
+            if (data.action === 'existing_card') {
+                showStatus('既存のビンゴカードを取得しました！', 'success');
+            } else {
+                showStatus('新しいビンゴカードを作成しました！', 'success');
+            }
+        } else {
+            showStatus(data.error || 'カードの取得に失敗しました。', 'error');
+        }
+        
+    } catch (error) {
+        console.error('ログインエラー:', error);
+        
+        let errorMessage = 'ログインに失敗しました。';
+        if (error.message.includes('APIファイル')) {
+            errorMessage = 'APIファイルが見つかりません。システム管理者にお問い合わせください。';
+        } else if (error.message.includes('Failed to fetch')) {
+            errorMessage = 'サーバーとの接続に失敗しました。ネットワーク接続を確認してください。';
+        } else if (error.message.includes('無効なレスポンス')) {
+            errorMessage = 'サーバーエラーが発生しました。しばらく時間をおいて再試行してください。';
+        } else if (error.message.includes('無効です')) {
+            errorMessage = 'パスワードが正しくありません。運営から配布されたパスワードを確認してください。';
+        }
+        
+        showStatus(errorMessage, 'error');
+    } finally {
+        loginBtn.disabled = false;
+        loginBtn.textContent = 'ビンゴカードを取得';
+        document.getElementById('password').value = '';
+    }
+}
+
+// ビンゴカードを表示する関数
+function showBingoCard() {
+    if (!currentCard || !currentCard.card_data) {
+        showStatus('カードデータが無効です。', 'error');
+        return;
+    }
+    
+    // 参加者情報を更新
+    const participantInfo = document.getElementById('participantInfo');
+    if (participantInfo) {
+        participantInfo.innerHTML = `
+            <h2>🎯 ${currentCard.participant_name || 'ゲスト'} さんのビンゴカード</h2>
+            <p>パスワード: ${currentCard.password}</p>
+        `;
+    }
+    
+    // ビンゴカードを生成
+    const bingoCard = document.getElementById('bingoCard');
+    if (bingoCard) {
+        bingoCard.innerHTML = `
+            <!-- ヘッダー -->
+            <div class="bingo-header">B</div>
+            <div class="bingo-header">I</div>
+            <div class="bingo-header">N</div>
+            <div class="bingo-header">G</div>
+            <div class="bingo-header">O</div>
+            
+            ${generateCardHTML(currentCard.card_data)}
+        `;
+    }
+    
+    // 表示切り替え
+    document.getElementById('loginSection').style.display = 'none';
+    document.getElementById('bingoSection').style.display = 'block';
+}
+
+// ビンゴカードのHTMLを生成
+function generateCardHTML(cardData) {
+    let html = '';
+    
+    for (let row = 0; row < 5; row++) {
+        for (let col = 0; col < 5; col++) {
+            const number = cardData[row][col];
+            const cellId = `cell-${row}-${col}`;
+            
+            if (number === 0) {
+                // FREE スペース
+                html += `<div class="bingo-cell free" id="${cellId}">FREE</div>`;
+            } else {
+                html += `<div class="bingo-cell" id="${cellId}" onclick="toggleCell('${cellId}')">${number}</div>`;
+            }
+        }
+    }
+    
+    return html;
+}
+
+// セルをクリックした時の処理
+function toggleCell(cellId) {
+    const cell = document.getElementById(cellId);
+    if (cell && !cell.classList.contains('free')) {
+        cell.classList.toggle('marked');
+        
+        // 自動ビンゴチェック
+        setTimeout(() => {
+            autoCheckBingo();
+        }, 100);
+    }
+}
+
+// 呼ばれた番号を表示に反映
+function updateCalledNumbers() {
+    if (!currentCard || !currentCard.card_data) return;
+    
+    // 最新の番号を表示
+    const currentNumberEl = document.getElementById('currentNumber');
+    if (currentNumberEl && calledNumbers.length > 0) {
+        const latestNumber = calledNumbers[calledNumbers.length - 1];
+        currentNumberEl.innerHTML = `最新の番号: <span style="color: #e74c3c; font-size: 1.2em;">${latestNumber}</span>`;
+    } else if (currentNumberEl) {
+        currentNumberEl.textContent = '待機中';
+    }
+    
+    // カード上の番号をマーク
+    for (let row = 0; row < 5; row++) {
+        for (let col = 0; col < 5; col++) {
+            const number = currentCard.card_data[row][col];
+            const cellId = `cell-${row}-${col}`;
+            const cell = document.getElementById(cellId);
+            
+            if (cell && number !== 0 && calledNumbers.includes(number)) {
+                cell.classList.add('called');
+            }
+        }
+    }
+    
+    updateConnectionStatus('online');
+}
+
+// ページ読み込み時にログイン状態をチェック
+document.addEventListener('DOMContentLoaded', function() {
+    checkSavedLogin();
+    
+    // Enterキーでログイン
+    const passwordField = document.getElementById('password');
+    const participantField = document.getElementById('participantName');
+    
+    if (passwordField) {
+        passwordField.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                login();
+            }
+        });
+    }
+    
+    if (participantField) {
+        participantField.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                login();
+            }
+        });
+    }
+    
+    // ポップアップの背景クリックで閉じる
+    const popup = document.getElementById('bingoPopup');
+    if (popup) {
+        popup.addEventListener('click', function(e) {
+            if (e.target === popup) {
                 closeBingoPopup();
             }
         });
+    }
+});
 
-        // ページ読み込み時にログイン状態をチェック
-        document.addEventListener('DOMContentLoaded', function() {
-            checkSavedLogin();
-        });
-
-        // 保存されたログイン状態をチェック
-        function checkSavedLogin() {
-            const savedSessionId = localStorage.getItem('bingoSessionId');
-            const savedCard = localStorage.getItem('bingoCardData');
-            const savedLoginTime = localStorage.getItem('bingoLoginTime');
-            
-            // 24時間以内のログイン情報のみ有効
-            const twentyFourHours = 24 * 60 * 60 * 1000;
-            if (savedSessionId && savedCard && savedLoginTime) {
-                const loginTime = parseInt(savedLoginTime);
-                if (Date.now() - loginTime < twentyFourHours) {
-                    // セッション有効性を確認
-                    validateSession(savedSessionId, savedCard);
-                    return;
-                }
-            }
-            
-            clearSavedLogin();
-            showLoginForm();
-        }
-
-        // セッション有効性確認
-        async function validateSession(sessionId, savedCard) {
-            try {
-                const response = await fetch('../api/validate-session.php', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${sessionId}`
-                    },
-                    body: JSON.stringify({
-                        session_id: sessionId
-                    }),
-                    credentials: 'same-origin'
-                });
-                
-                const data = await response.json();
-                
-                if (data.success && data.valid) {
-                    currentCard = JSON.parse(savedCard);
-                    showBingoCard();
-                    initializeGame();
-                    showStatus('セッションを復元しました', 'success');
-                } else {
-                    clearSavedLogin();
-                    showLoginForm();
-                    showStatus('セッションが無効です。再ログインしてください。', 'warning');
-                }
-            } catch (error) {
-                console.error('セッション検証エラー:', error);
-                clearSavedLogin();
-                showLoginForm();
-            }
-        }
-
-        // セッション情報をクリア
-        function clearSavedLogin() {
-            localStorage.removeItem('bingoSessionId');
-            localStorage.removeItem('bingoCardData');
-            localStorage.removeItem('bingoLoginTime');
-            console.log('セッション情報をクリアしました');
-        }
-
-        // ログアウト時にセッションを無効化
-        async function logout() {
-            const sessionId = localStorage.getItem('bingoSessionId');
-            
-            if (sessionId) {
-                try {
-                    await fetch('../api/logout.php', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                            'Authorization': `Bearer ${sessionId}`
-                        },
-                        body: JSON.stringify({
-                            session_id: sessionId
-                        }),
-                        credentials: 'same-origin'
-                    });
-                } catch (error) {
-                    console.error('ログアウト処理エラー:', error);
-                }
-            }
-            
-            clearSavedLogin();
-            currentCard = null;
-            calledNumbers = [];
-            
-            if (bingoCheckInterval) {
-                clearInterval(bingoCheckInterval);
-                bingoCheckInterval = null;
-            }
-            
-            document.getElementById('bingoSection').style.display = 'none';
-            document.getElementById('loginSection').style.display = 'block';
-            
-            showStatus('ログアウトしました', 'info');
-        }
-
-        // ログインフォームを表示
-        function showLoginForm() {
-            const loginSection = document.getElementById('loginSection');
-            if (!loginSection.querySelector('.login-form').innerHTML) {
-                loginSection.querySelector('.login-form').innerHTML = `
-                    <div class="form-group">
-                        <label for="password">パスワード:</label>
-                        <input type="password" id="password" name="password" required 
-                               placeholder="8桁のパスワードを入力">
-                    </div>
-                    <div class="form-group">
-                        <label for="participantName">参加者名（任意）:</label>
-                        <input type="text" id="participantName" name="participantName" 
-                               placeholder="表示名を入力（省略可）">
-                    </div>
-                    <button type="button" class="login-btn" id="loginBtn" onclick="login()">
-                        ビンゴカードを取得
-                    </button>
-                `;
-                
-                // Enterキーでログイン
-                document.getElementById('password').addEventListener('keypress', function(e) {
-                    if (e.key === 'Enter') {
-                        login();
-                    }
-                });
-            }
-            
-            loginSection.querySelector('.status').innerHTML = `
-                パスワードを入力してビンゴカードを取得してください。<br>
-                <small>※ログイン状態は24時間保持されます</small>
-            `;
-        }
+// Escapeキーでポップアップを閉じる
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+        closeBingoPopup();
+    }
+});
     </script>
 </body>
 </html>
