@@ -889,6 +889,53 @@
             }
         }
 
+        // 接続ステータスを更新する関数を追加
+        function updateConnectionStatus(status) {
+            const statusElement = document.getElementById('connectionStatus');
+            if (!statusElement) return;
+            
+            statusElement.className = `connection-status ${status}`;
+            
+            switch (status) {
+                case 'online':
+                    statusElement.textContent = '🟢 オンライン';
+                    break;
+                case 'offline':
+                    statusElement.textContent = '🔴 オフライン';
+                    break;
+                case 'connecting':
+                    statusElement.textContent = '🟡 接続中...';
+                    break;
+                case 'error':
+                    statusElement.textContent = '❌ エラー';
+                    break;
+                default:
+                    statusElement.textContent = '❓ 不明';
+            }
+        }
+
+        // ステータス表示用の関数を追加
+        function showStatus(message, type = 'info') {
+            const gameStatus = document.getElementById('gameStatus');
+            if (!gameStatus) {
+                console.log(`Status: ${message}`);
+                return;
+            }
+            
+            gameStatus.className = `status ${type}`;
+            gameStatus.innerHTML = message;
+            
+            // 自動的に消去（成功・情報メッセージのみ）
+            if (type === 'success' || type === 'info') {
+                setTimeout(() => {
+                    if (gameStatus.className.includes(type)) {
+                        gameStatus.className = 'status info';
+                        gameStatus.innerHTML = '番号が呼ばれたら、カードの該当する数字をクリックしてマークしてください。';
+                    }
+                }, 5000);
+            }
+        }
+
         // ゲーム初期化
         function initializeGame() {
             console.log('=== ゲーム初期化開始 ===');

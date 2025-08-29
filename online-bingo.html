@@ -1,0 +1,31 @@
+// 接続ステータスを更新する関数を追加
+function updateConnectionStatus(isConnected, message = '') {
+    const statusElement = document.getElementById('connection-status');
+    if (statusElement) {
+        if (isConnected) {
+            statusElement.textContent = '接続中';
+            statusElement.className = 'status-connected';
+        } else {
+            statusElement.textContent = message || '接続エラー';
+            statusElement.className = 'status-disconnected';
+        }
+    }
+}
+
+// ステータスメッセージを表示する関数を追加
+function showStatus(message, type = 'info') {
+    const statusElement = document.getElementById('status-message');
+    if (statusElement) {
+        statusElement.textContent = message;
+        statusElement.className = `status-${type}`;
+        
+        // 3秒後に自動で消す
+        setTimeout(() => {
+            statusElement.textContent = '';
+            statusElement.className = '';
+        }, 3000);
+    } else {
+        // ステータス要素がない場合はコンソールに出力
+        console.log(`Status: ${message}`);
+    }
+}
