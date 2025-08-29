@@ -169,7 +169,7 @@
             待機中
         </div>
         
-        <button class="refresh-btn" onclick="forceRefresh()">🔄 手動更新</button>
+        <button class="refresh-btn" onclick="forceRefresh()">🔄 更新</button>
         
         <div class="called-numbers">
             <h2>📋 これまでに出た番号</h2>
@@ -193,12 +193,6 @@
         let calledNumbers = [];
         let sortMode = 'order';
         let lastUpdateTime = null;
-        let isPolling = true;
-
-        // より効率的な更新間隔とキャッシュ戦略
-        let updateInterval = 15000; // 15秒に変更
-        let backoffMultiplier = 1;
-        let maxBackoff = 60000; // 最大1分
         
         async function loadCalledNumbers() {
             try {
@@ -247,18 +241,14 @@
                     });
                 }
                 
-                // 成功時はバックオフをリセット
-                resetBackoff();
-                
             } catch (error) {
                 console.error('データの読み込みエラー:', error);
-                increaseBackoff();
             }
         }
 
         // 手動更新
         function forceRefresh() {
-            console.log('手動更新を実行します...');
+            console.log('更新しています...');
             loadCalledNumbers();
         }
 
@@ -332,35 +322,10 @@
             });
         }
 
-        function resetBackoff() {
-            backoffMultiplier = 1;
-            updateInterval = 15000; // 15秒に戻す
-        }
-
-        function increaseBackoff() {
-            backoffMultiplier = Math.min(backoffMultiplier * 2, 4);
-            updateInterval = 15000 * backoffMultiplier;
-            console.log('バックオフ適用:', updateInterval / 1000, '秒');
-        }
-
-        // アダプティブポーリング
-        function startPolling() {
-            function poll() {
-                if (isPolling) {
-                    loadCalledNumbers();
-                }
-                
-                // 動的間隔で次のポーリングをスケジュール
-                setTimeout(poll, updateInterval);
-            }
-            poll();
-        }
-
         // 初期化
         function initialize() {
             console.log('初期化を開始します...');
             loadCalledNumbers();
-            startPolling();
         }
 
         // 初期読み込み
@@ -371,33 +336,7 @@
             console.log('ページフォーカス時の更新...');
             forceRefresh();
         });
-
-        // ページが非表示になったときはポーリングを停止
-        document.addEventListener('visibilitychange', () => {
-            isPolling = !document.hidden;
-            if (isPolling) {
-                console.log('ポーリング再開');
-                loadCalledNumbers();
-            } else {
-                console.log('ポーリング停止');
-            }
-        });
     </script>
 </body>
 </html>
-
-</body>
-</html>
-
-<?php
-// api/get-data.phpに追加
-header('Cache-Control: public, max-age=5');
-$etag = md5(serialize($data));
-header('ETag: "' . $etag . '"');
-
-if (isset($_SERVER['HTTP_IF_NONE_MATCH']) && $_SERVER['HTTP_IF_NONE_MATCH'] === '"' . $etag . '"') {
-    http_response_code(304);
-    exit;
-}
-?>
 
